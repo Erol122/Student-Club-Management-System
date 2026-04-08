@@ -408,6 +408,11 @@ textarea {
   margin-bottom: 14px;
 }
 
+.section-card-actions {
+  display: flex;
+  align-items: center;
+}
+
 .section-card-header h3 {
   margin: 0;
   font-family: 'Plus Jakarta Sans', sans-serif;
@@ -551,6 +556,7 @@ textarea {
   text-decoration: none;
   display: inline-flex;
   align-items: center;
+  white-space: nowrap;
 }
 
 .group-link-muted {
@@ -593,6 +599,11 @@ textarea {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
+  align-items: start;
+}
+
+.directory-layout > .section-card {
+  height: fit-content;
 }
 
 .directory-grid {
@@ -648,8 +659,11 @@ textarea {
 .tab-bar {
   margin-top: 12px;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: thin;
   gap: 8px;
+  padding-bottom: 2px;
 }
 
 .tab-btn {
@@ -660,6 +674,7 @@ textarea {
   padding: 8px 11px;
   font-weight: 700;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .tab-btn.active {
@@ -673,6 +688,37 @@ textarea {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+}
+
+.club-detail-card .section-card-header {
+  align-items: center;
+  gap: 14px;
+}
+
+.club-detail-card .section-card-header > div {
+  min-width: 0;
+}
+
+.club-detail-card .club-summary {
+  margin-top: 2px;
+}
+
+.club-detail-card .member-row {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.club-detail-card .member-row > div:nth-child(2) {
+  min-width: 0;
+}
+
+.club-detail-card .member-row strong,
+.club-detail-card .member-row p {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .member-note {

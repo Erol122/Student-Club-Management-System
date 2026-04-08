@@ -38,6 +38,7 @@ function ClubDetails({
 
   return (
     <SectionCard
+      className="club-detail-card"
       title={selectedClub.name}
       subtitle={`${selectedClub.category} · Led by ${selectedClub.leader}`}
       actions={

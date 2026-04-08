@@ -1,1 +1,0 @@
-# Student-Club-Management-System

@@ -1,0 +1,11 @@
+i used the standard create react app stack.
+-	all the code that we need for the project is in src: app.js and app.css
+-	all the „glass“ effects and colours are in src/app.css. you can add your styles in there or import your own css files into src
+-	if you're building a new part, create a new view state. if you're working on something that already exists, you can add onto the code i already made/remake it entirely yourself
+-	put logos/images in the public folder
+-	use the buttons and popups i made so that we can keep the layout the same/similar (for popups it's the modal bubbly classes)
+-	use the same colours that are already in the code so that the theme matches (var (--accent)
+-	add transitions and hovers, they are already applied for the most part in the demo
+-	i used emojis for the demo but if we want to switch to icons or pictures, make sure the size is good
+-	if you're struggling to apply the styling to your part of code, you can text me and i can try to help
+- to run, write "cd ius-management-system" first and then npm start because i have 2 folders accidentally

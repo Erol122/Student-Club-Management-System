@@ -5,7 +5,6 @@ import {
   initialClubs,
   initialEvents,
   initialMembershipRequests,
-  initialMessages,
 } from '../data/mockData';
 
 const fmtDate = (ts) =>
@@ -21,7 +20,7 @@ const NOW = Date.now();
 
 const initialState = {
   currentUser: null,
-  activeView: 'dashboard',
+  activeView: 'home',
   activeRole: 'Admin',
   selectedClubId: initialClubs[0]?.id ?? '',
   clubDetailTab: 'overview',
@@ -30,13 +29,12 @@ const initialState = {
   membershipRequests: initialMembershipRequests,
   announcements: initialAnnouncements,
   events: initialEvents,
-  messages: initialMessages,
   activityLog: [
     { id: 'al-seed-1', type: 'event',        message: 'Policy Debate Night scheduled for Apr 16',      ts: NOW - 3_600_000 },
-    { id: 'al-seed-2', type: 'member',       message: 'Adnan Begovic requested to join Debate Society', ts: NOW - 7_200_000 },
+    { id: 'al-seed-2', type: 'member',       message: 'Arman requested to join Debate Society', ts: NOW - 7_200_000 },
     { id: 'al-seed-3', type: 'announcement', message: 'Public speaking workshop announcement published', ts: NOW - 14_400_000 },
     { id: 'al-seed-4', type: 'club',         message: 'Entrepreneurship Circle proposal submitted',     ts: NOW - 86_400_000 },
-    { id: 'al-seed-5', type: 'member',       message: 'Lamija Kurtic requested to join Creative Media Lab', ts: NOW - 90_000_000 },
+    { id: 'al-seed-5', type: 'member',       message: 'Tara requested to join Creative Media Lab', ts: NOW - 90_000_000 },
   ],
   searchQuery: '',
   categoryFilter: 'All',
@@ -102,6 +100,8 @@ function reducer(state, action) {
         accent: '#5b8def',
         health: 'Growing',
         nextEvent: 'Planning session pending',
+        groupPlatform: 'WhatsApp',
+        groupLink: '',
         announcementsCount: 0,
         members: [
           { id: `${action.payload}-leader`, name: req.proposedBy, role: 'Club Leader', program: 'Club Founder' },
@@ -244,18 +244,6 @@ function reducer(state, action) {
             : evt
         ),
       };
-    }
-
-    // ── Messages ──────────────────────────────────────────────────
-    case 'POST_MESSAGE': {
-      const msg = {
-        id: `msg-${Date.now()}`,
-        clubId: action.payload.clubId,
-        author: state.currentUser?.name,
-        text: action.payload.text,
-        ts: Date.now(),
-      };
-      return { ...state, messages: [...state.messages, msg] };
     }
 
     // ── Roles ─────────────────────────────────────────────────────

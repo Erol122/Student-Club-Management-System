@@ -1,25 +1,29 @@
 import { useAppDispatch } from '../../context/AppContext';
 import { LOGIN_USERS } from '../../data/mockData';
+import iusLogo from '../../data/IUS_Official_Logo.png';
 
 export function LoginView() {
   const dispatch = useAppDispatch();
 
   return (
     <div className="login-page">
-      <div className="ambient ambient-one" />
-      <div className="ambient ambient-two" />
-
       <div className="login-frame">
         <div className="login-header">
-          <div className="brand-mark" style={{ margin: '0 auto 20px' }}>IUS</div>
-          <h1 className="login-title">Student Organizations</h1>
-          <p className="login-subtitle">Choose a role to sign in and explore the platform.</p>
+          <img className="login-logo-image" src={iusLogo} alt="IUS logo" />
+          <h1 className="login-title">Student Clubs Hub</h1>
+          <p className="login-subtitle">
+            A clean and simple way for students to create clubs, manage activities, and coordinate
+            members.
+          </p>
         </div>
 
         <div className="login-cards">
           {LOGIN_USERS.map((user) => (
             <article key={user.role} className="login-card">
-              <div className="login-card-avatar" style={{ background: `linear-gradient(135deg, ${user.color}, ${user.color}cc)` }}>
+              <div
+                className="login-card-avatar"
+                style={{ background: `linear-gradient(150deg, ${user.color}, #1a2642)` }}
+              >
                 {user.avatar}
               </div>
               <div className="login-card-body">
@@ -30,16 +34,15 @@ export function LoginView() {
               <button
                 type="button"
                 className="login-card-btn"
-                style={{ '--btn-color': user.color }}
                 onClick={() => dispatch({ type: 'LOGIN', payload: user })}
               >
-                Sign in as {user.role}
+                Continue as {user.role}
               </button>
             </article>
           ))}
         </div>
 
-        <p className="login-note">This is a demo platform. No real data is stored or transmitted.</p>
+        <p className="login-note">Demo mode. Data is local to this session.</p>
       </div>
     </div>
   );

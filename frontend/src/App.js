@@ -7,11 +7,10 @@ import { Topbar } from './components/layout/Topbar';
 import { LoginView } from './components/views/LoginView';
 import { navItems } from './data/mockData';
 
-const DashboardView  = lazy(() => import('./components/views/DashboardView').then((m) => ({ default: m.DashboardView })));
-const ClubsView      = lazy(() => import('./components/views/ClubsView').then((m) => ({ default: m.ClubsView })));
+const DashboardView = lazy(() => import('./components/views/DashboardView').then((m) => ({ default: m.DashboardView })));
+const ClubsView = lazy(() => import('./components/views/ClubsView').then((m) => ({ default: m.ClubsView })));
 const OperationsView = lazy(() => import('./components/views/OperationsView').then((m) => ({ default: m.OperationsView })));
 
-// ── Authenticated shell ──────────────────────────────────────────────────────
 const AuthenticatedShell = memo(function AuthenticatedShell({ currentUser }) {
   const dispatch = useAppDispatch();
   const {
@@ -23,7 +22,6 @@ const AuthenticatedShell = memo(function AuthenticatedShell({ currentUser }) {
     membershipRequests,
     announcements,
     events,
-    messages,
     activityLog,
     searchQuery,
     categoryFilter,
@@ -39,85 +37,82 @@ const AuthenticatedShell = memo(function AuthenticatedShell({ currentUser }) {
 
   return (
     <div className="app-shell">
-      <div className="ambient ambient-one" />
-      <div className="ambient ambient-two" />
+      <Sidebar
+        activeView={activeView}
+        items={navItems}
+        pendingCount={pendingCount}
+        currentUser={currentUser}
+        onNavigate={(view) => dispatch({ type: 'NAVIGATE', payload: view })}
+      />
 
-      <div className="platform-frame">
-        <Sidebar
+      <main className="platform-main">
+        <Topbar
           activeView={activeView}
-          items={navItems}
-          pendingCount={pendingCount}
-          onNavigate={(view) => dispatch({ type: 'NAVIGATE', payload: view })}
+          currentUser={currentUser}
+          clubs={clubs}
+          selectedClubId={selectedClubId}
+          selectedClub={selectedClub}
+          onSelectClub={(clubId) => dispatch({ type: 'SELECT_CLUB', payload: clubId })}
         />
 
-        <main className="platform-main">
-          <Topbar
-            activeView={activeView}
-            currentUser={currentUser}
-            selectedClub={selectedClub}
-          />
+        <Suspense fallback={<div className="view-loading">Loading workspace...</div>}>
+          {activeView === 'home' && (
+            <DashboardView
+              activeRole={activeRole}
+              currentUser={currentUser}
+              clubs={clubs}
+              clubRequests={clubRequests}
+              membershipRequests={membershipRequests}
+              announcements={announcements}
+              events={events}
+              activityLog={activityLog}
+              selectedClub={selectedClub}
+            />
+          )}
 
-          <Suspense fallback={<div className="view-loading" />}>
-            {activeView === 'dashboard' && (
-              <DashboardView
-                activeRole={activeRole}
-                currentUser={currentUser}
-                clubs={clubs}
-                clubRequests={clubRequests}
-                membershipRequests={membershipRequests}
-                announcements={announcements}
-                events={events}
-                activityLog={activityLog}
-                selectedClub={selectedClub}
-              />
-            )}
+          {activeView === 'clubs' && selectedClub && (
+            <ClubsView
+              activeRole={activeRole}
+              currentUser={currentUser}
+              clubs={clubs}
+              selectedClub={selectedClub}
+              selectedClubId={selectedClubId}
+              clubDetailTab={clubDetailTab}
+              announcements={announcements}
+              events={events}
+              membershipRequests={membershipRequests}
+              searchQuery={searchQuery}
+              categoryFilter={categoryFilter}
+            />
+          )}
 
-            {activeView === 'clubs' && selectedClub && (
-              <ClubsView
-                activeRole={activeRole}
-                currentUser={currentUser}
-                clubs={clubs}
-                selectedClub={selectedClub}
-                selectedClubId={selectedClubId}
-                clubDetailTab={clubDetailTab}
-                announcements={announcements}
-                events={events}
-                messages={messages}
-                membershipRequests={membershipRequests}
-                searchQuery={searchQuery}
-                categoryFilter={categoryFilter}
-              />
-            )}
+          {activeView === 'manage' && selectedClub && (
+            <OperationsView
+              activeRole={activeRole}
+              currentUser={currentUser}
+              clubs={clubs}
+              clubRequests={clubRequests}
+              membershipRequests={membershipRequests}
+              selectedClub={selectedClub}
+              announcements={announcements}
+              events={events}
+            />
+          )}
 
-            {activeView === 'operations' && selectedClub && (
-              <OperationsView
-                activeRole={activeRole}
-                currentUser={currentUser}
-                clubs={clubs}
-                clubRequests={clubRequests}
-                membershipRequests={membershipRequests}
-                selectedClub={selectedClub}
-                announcements={announcements}
-                events={events}
-              />
-            )}
-          </Suspense>
-        </main>
-      </div>
+        </Suspense>
+      </main>
 
       <Toast />
     </div>
   );
 });
 
-// ── Root shell (decides login vs. app) ──────────────────────────────────────
 const AppShell = memo(function AppShell() {
   const { currentUser } = useAppState();
   if (!currentUser) return <LoginView />;
   return <AuthenticatedShell currentUser={currentUser} />;
 });
 
-// ── Root ────────────────────────────────────────────────────────────────────
 export default function App() {
   return (
     <AppProvider>

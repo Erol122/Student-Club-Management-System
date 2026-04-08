@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { memo } from 'react';
 
-export function SectionCard({ title, subtitle, actions, children, className = '' }) {
+export const SectionCard = memo(function SectionCard({ title, subtitle, actions, children, className = '' }) {
   return (
     <section className={`section-card ${className}`.trim()}>
       <header className="section-card-header">
@@ -13,4 +13,4 @@ export function SectionCard({ title, subtitle, actions, children, className = ''
       {children}
     </section>
   );
-}
+});

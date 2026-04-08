@@ -1,6 +1,6 @@
-import React from 'react';
+import { memo } from 'react';
 
-export function Sidebar({ activeView, items, onNavigate }) {
+export const Sidebar = memo(function Sidebar({ activeView, items, pendingCount, onNavigate }) {
   return (
     <aside className="sidebar">
       <div className="brand-block">
@@ -12,17 +12,21 @@ export function Sidebar({ activeView, items, onNavigate }) {
       </div>
 
       <nav className="sidebar-nav">
-        {items.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            className={`sidebar-link ${activeView === item.id ? 'active' : ''}`}
-            onClick={() => onNavigate(item.id)}
-          >
-            <span className="sidebar-link-badge">{item.short}</span>
-            <span>{item.label}</span>
-          </button>
-        ))}
+        {items.map((item) => {
+          const showBadge = item.showBadge && pendingCount > 0;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              className={`sidebar-link ${activeView === item.id ? 'active' : ''}`}
+              onClick={() => onNavigate(item.id)}
+            >
+              <span className="sidebar-link-badge">{item.short}</span>
+              <span>{item.label}</span>
+              {showBadge && <span className="nav-badge">{pendingCount}</span>}
+            </button>
+          );
+        })}
       </nav>
 
       <div className="sidebar-footer">
@@ -31,4 +35,4 @@ export function Sidebar({ activeView, items, onNavigate }) {
       </div>
     </aside>
   );
-}
+});

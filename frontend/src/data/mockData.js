@@ -1,9 +1,32 @@
-export const roleOptions = ['Admin', 'Club Leader', 'Member'];
+export const LOGIN_USERS = [
+  {
+    name: 'Platform Admin',
+    role: 'Admin',
+    avatar: 'PA',
+    description: 'Manage all clubs, approve proposals, and oversee platform operations.',
+    color: '#0f3d73',
+  },
+  {
+    name: 'Amina Hadzic',
+    role: 'Club Leader',
+    avatar: 'AH',
+    clubId: 'robotics-club',
+    description: 'Lead the Robotics Club — manage members, events, and announcements.',
+    color: '#4b7bec',
+  },
+  {
+    name: 'Demo Student',
+    role: 'Member',
+    avatar: 'DS',
+    description: 'Browse clubs, request membership, and follow your clubs\' activities.',
+    color: '#6c5ce7',
+  },
+];
 
 export const navItems = [
-  { id: 'dashboard', label: 'Dashboard', short: 'DB' },
-  { id: 'clubs', label: 'Club Directory', short: 'CD' },
-  { id: 'operations', label: 'Operations Center', short: 'OC' },
+  { id: 'dashboard',  label: 'Dashboard',         short: 'DB' },
+  { id: 'clubs',      label: 'Club Directory',     short: 'CD' },
+  { id: 'operations', label: 'Operations Center',  short: 'OC', showBadge: true },
 ];
 
 export const initialClubs = [
@@ -134,7 +157,7 @@ export const initialEvents = [
     title: 'Autonomous Systems Lab',
     date: '2026-04-12',
     location: 'Innovation Lab 2',
-    attendance: ['Amina Hadzic', 'Tarik Zeco'],
+    rsvp: ['Amina Hadzic', 'Tarik Zeco', 'Demo Student'],
   },
   {
     id: 'event-2',
@@ -142,7 +165,7 @@ export const initialEvents = [
     title: 'Photo Walk',
     date: '2026-04-14',
     location: 'Campus Courtyard',
-    attendance: ['Sara Kovacevic'],
+    rsvp: ['Sara Kovacevic', 'Emir Basic'],
   },
   {
     id: 'event-3',
@@ -150,6 +173,46 @@ export const initialEvents = [
     title: 'Policy Debate Night',
     date: '2026-04-16',
     location: 'Seminar Hall B',
-    attendance: ['Haris Alic', 'Mina Selimovic'],
+    rsvp: ['Haris Alic', 'Mina Selimovic'],
+  },
+];
+
+const NOW = Date.now();
+
+export const initialMessages = [
+  {
+    id: 'msg-1',
+    clubId: 'robotics-club',
+    author: 'Amina Hadzic',
+    text: 'Reminder to bring your laptops to Friday\'s session — we\'re testing the new motor controllers.',
+    ts: NOW - 3_600_000,
+  },
+  {
+    id: 'msg-2',
+    clubId: 'robotics-club',
+    author: 'Tarik Zeco',
+    text: 'Got it! Should we bring the breadboard kits too?',
+    ts: NOW - 2_700_000,
+  },
+  {
+    id: 'msg-3',
+    clubId: 'robotics-club',
+    author: 'Demo Student',
+    text: 'I can bring extra jumper wires if anyone needs them.',
+    ts: NOW - 1_800_000,
+  },
+  {
+    id: 'msg-4',
+    clubId: 'media-lab',
+    author: 'Sara Kovacevic',
+    text: 'All camera gear is reserved for the photo walk on Monday. See you all there!',
+    ts: NOW - 7_200_000,
+  },
+  {
+    id: 'msg-5',
+    clubId: 'debate-society',
+    author: 'Haris Alic',
+    text: 'The topic for Thursday\'s policy debate is now confirmed: AI Regulation in Higher Education.',
+    ts: NOW - 10_800_000,
   },
 ];

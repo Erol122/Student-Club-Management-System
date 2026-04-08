@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { memo } from 'react';
 
-export function MetricCard({ label, value, detail }) {
+export const MetricCard = memo(function MetricCard({ label, value, detail }) {
   return (
     <article className="metric-card">
       <span className="metric-label">{label}</span>
@@ -8,4 +8,4 @@ export function MetricCard({ label, value, detail }) {
       <p className="metric-detail">{detail}</p>
     </article>
   );
-}
+});

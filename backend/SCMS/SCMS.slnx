@@ -1,0 +1,9 @@
+<Solution>
+  <Project Path="SCM.Api/SCM.Api.csproj" />
+  <Project Path="SCMS.AppHost/SCMS.AppHost.csproj" Id="39c58285-f282-4471-84a2-f326c6bb6d67" />
+  <Project Path="SCMS.Application/SCMS.Application.csproj" Id="3b0850dc-042b-4513-b56b-70c7b2d3e064" />
+  <Project Path="SCMS.Domain/SCMS.Domain.csproj" Id="2b041c8f-86b8-4a24-a7a9-b735bf165be4" />
+  <Project Path="SCMS.Infrastructure/SCMS.Infrastructure.csproj" Id="9d0f1c4a-d34c-469c-993a-cb1e4d7f44bb" />
+  <Project Path="SCMS.MigrationService/SCMS.MigrationService.csproj" />
+  <Project Path="SCMS.ServiceDefaults/SCMS.ServiceDefaults.csproj" />
+</Solution>

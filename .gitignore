@@ -1,0 +1,43 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+Desktop.ini
+.vs/
+.vscode/
+.idea/
+
+# Visual Studio / Rider
+*.user
+*.rsuser
+*.suo
+*.userosscache
+*.sln.docstates
+
+# .NET build outputs
+**/bin/
+**/obj/
+**/out/
+**/TestResults/
+*.nupkg
+*.snupkg
+
+# Aspire / local dependencies
+**/Properties/ServiceDependencies/
+**/Properties/ServiceDependencies.local.json
+aspirate-output/
+
+# Logs
+*.log
+logs/
+
+# Node / React
+frontend/node_modules/
+frontend/build/
+frontend/coverage/
+frontend/.cache/
+frontend/.eslintcache
+
+# Environment files
+.env
+.env.*
+!.env.example

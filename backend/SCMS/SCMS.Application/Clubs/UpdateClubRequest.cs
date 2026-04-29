@@ -1,6 +1,6 @@
 using SCMS.Domain.Enums;
 
-namespace SCM.Api.Models.Clubs;
+namespace SCMS.Application.Clubs;
 
 public sealed record UpdateClubRequest(
     string Name,

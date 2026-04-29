@@ -15,6 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\SCMS.Application\SCMS.Application.csproj" />
     <ProjectReference Include="..\SCMS.Infrastructure\SCMS.Infrastructure.csproj" />
     <ProjectReference Include="..\SCMS.ServiceDefaults\SCMS.ServiceDefaults.csproj" />
   </ItemGroup>

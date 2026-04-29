@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Data.SqlClient;
-using Microsoft.EntityFrameworkCore;
+using SCMS.Application.Common.Exceptions;
 
 namespace SCM.Api.ErrorHandling;
 
@@ -41,30 +40,20 @@ public sealed class GlobalExceptionHandler(
     {
         var (statusCode, title, detail) = exception switch
         {
-            DbUpdateConcurrencyException => (
-                StatusCodes.Status409Conflict,
-                "Concurrency conflict",
-                "The resource was changed or deleted by another operation."),
-
-            DbUpdateException dbUpdateException when IsUniqueConstraintViolation(dbUpdateException) => (
+            PersistenceConflictException => (
                 StatusCodes.Status409Conflict,
                 "Duplicate resource",
-                "A resource with the same unique value already exists."),
+                exception.Message),
 
-            DbUpdateException dbUpdateException when IsForeignKeyViolation(dbUpdateException) => (
+            RelatedResourceNotFoundException => (
                 StatusCodes.Status400BadRequest,
                 "Invalid related resource",
-                "One or more referenced resources do not exist."),
+                exception.Message),
 
-            DbUpdateException => (
-                StatusCodes.Status400BadRequest,
-                "Database update failed",
-                "The submitted data could not be saved."),
-
-            SqlException sqlException when IsDatabaseUnavailable(sqlException) => (
+            PersistenceUnavailableException => (
                 StatusCodes.Status503ServiceUnavailable,
                 "Database unavailable",
-                "The database is not available right now."),
+                exception.Message),
 
             OperationCanceledException => (
                 ClientClosedRequestStatusCode,
@@ -90,22 +79,5 @@ public sealed class GlobalExceptionHandler(
         problem.Extensions["traceId"] = httpContext.TraceIdentifier;
 
         return problem;
-    }
-
-    private static bool IsUniqueConstraintViolation(DbUpdateException exception)
-    {
-        return exception.GetBaseException() is SqlException sqlException
-            && sqlException.Number is 2601 or 2627;
-    }
-
-    private static bool IsForeignKeyViolation(DbUpdateException exception)
-    {
-        return exception.GetBaseException() is SqlException sqlException
-            && sqlException.Number == 547;
-    }
-
-    private static bool IsDatabaseUnavailable(SqlException exception)
-    {
-        return exception.Number is -2 or 53 or 4060 or 10053 or 10054 or 10060 or 10061;
     }
 }

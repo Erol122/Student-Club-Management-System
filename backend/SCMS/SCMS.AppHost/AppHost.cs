@@ -1,14 +1,19 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
-var scmsDatabase = builder.AddConnectionString("scmsdb");
+var sqlServer = builder.AddSqlServer("sql")
+    .WithImageTag("2022-latest")
+    .WithDataVolume("scms-sqlserver-2022-data");
+var scmsDatabase = sqlServer.AddDatabase("scmsdb", "SCMS");
 var frontendPath = Path.GetFullPath(
     Path.Combine(builder.Environment.ContentRootPath, "..", "..", "..", "frontend"));
 
 var migrationService = builder.AddProject<Projects.SCMS_MigrationService>("scms-migrationservice")
-    .WithReference(scmsDatabase);
+    .WithReference(scmsDatabase)
+    .WaitFor(scmsDatabase);
 
 var api = builder.AddProject<Projects.SCM_Api>("scm-api")
     .WithReference(scmsDatabase)
+    .WaitFor(scmsDatabase)
     .WaitForCompletion(migrationService);
 
 builder.AddExecutable("scms-frontend", "npm", frontendPath, "start")

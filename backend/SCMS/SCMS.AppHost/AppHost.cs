@@ -17,10 +17,10 @@ var api = builder.AddProject<Projects.SCM_Api>("scm-api")
     .WaitForCompletion(migrationService);
 
 builder.AddExecutable("scms-frontend", "npm", frontendPath, "start")
-    .WithHttpEndpoint(targetPort: 3000, env: "PORT")
+    .WithHttpEndpoint(port: 5173, targetPort: 5173, env: "PORT", isProxied: false)
     .WithEnvironment("HOST", "0.0.0.0")
     .WithEnvironment("BROWSER", "none")
     .WithEnvironment("REACT_APP_API_BASE_URL", api.GetEndpoint("http"))
     .WaitFor(api);
-
+    
 builder.Build().Run();

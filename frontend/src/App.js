@@ -1,6 +1,9 @@
-import { lazy, memo, Suspense, useMemo } from 'react';
+import { lazy, memo, Suspense, useEffect, useMemo } from 'react';
+import { InteractionStatus } from '@azure/msal-browser';
+import { useIsAuthenticated, useMsal } from '@azure/msal-react';
 import './App.css';
 import { AppProvider, useAppDispatch, useAppState } from './context/AppContext';
+import { accountToUser } from './auth/authUser';
 import { Toast } from './components/common/Toast';
 import { Sidebar } from './components/layout/Sidebar';
 import { Topbar } from './components/layout/Topbar';
@@ -108,8 +111,37 @@ const AuthenticatedShell = memo(function AuthenticatedShell({ currentUser }) {
 });
 
 const AppShell = memo(function AppShell() {
+  const dispatch = useAppDispatch();
   const { currentUser } = useAppState();
-  if (!currentUser) return <LoginView />;
+  const { accounts, inProgress, instance } = useMsal();
+  const isAuthenticated = useIsAuthenticated();
+
+  const activeAccount = instance.getActiveAccount() ?? accounts[0] ?? null;
+
+  useEffect(() => {
+    if (!activeAccount) return;
+    instance.setActiveAccount(activeAccount);
+  }, [activeAccount, instance]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !activeAccount) return;
+
+    const nextUser = accountToUser(activeAccount);
+    if (currentUser?.id !== nextUser.id) {
+      dispatch({ type: 'LOGIN', payload: nextUser });
+    }
+  }, [activeAccount, currentUser?.id, dispatch, isAuthenticated]);
+
+  useEffect(() => {
+    if (isAuthenticated || inProgress !== InteractionStatus.None || !currentUser) return;
+    dispatch({ type: 'LOGOUT' });
+  }, [currentUser, dispatch, inProgress, isAuthenticated]);
+
+  if (inProgress !== InteractionStatus.None) {
+    return <div className="auth-loading">Completing sign in...</div>;
+  }
+
+  if (!isAuthenticated || !currentUser) return <LoginView />;
   return <AuthenticatedShell currentUser={currentUser} />;
 });
 

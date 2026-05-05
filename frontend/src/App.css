@@ -526,7 +526,8 @@ textarea {
 }
 
 .primary-button,
-.ghost-button {
+.ghost-button,
+.danger-button {
   border-radius: 10px;
   border: none;
   padding: 9px 12px;
@@ -550,6 +551,17 @@ textarea {
   border: 1px solid #d3e1f4;
   background: #edf4ff;
   color: #214d86;
+}
+
+.danger-button {
+  border: 1px solid #f2c7c7;
+  background: #fff2f2;
+  color: #9e3030;
+}
+
+.form-actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
 }
 
 .link-button {

@@ -16,6 +16,27 @@ function logEntry(message, type = 'info') {
   return { id: `al-${Date.now()}-${Math.random().toString(36).slice(2)}`, type, message, ts: Date.now() };
 }
 
+function slugify(value) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function uniqueClubId(name, existingClubs, currentId = null) {
+  const base = slugify(name) || `club-${Date.now()}`;
+  let candidate = base;
+  let index = 2;
+
+  while (existingClubs.some((club) => club.id !== currentId && club.id === candidate)) {
+    candidate = `${base}-${index}`;
+    index += 1;
+  }
+
+  return candidate;
+}
+
 const NOW = Date.now();
 
 const initialState = {
@@ -91,8 +112,9 @@ function reducer(state, action) {
     case 'APPROVE_CLUB': {
       const req = state.clubRequests.find((r) => r.id === action.payload);
       if (!req) return state;
+      const clubId = uniqueClubId(req.name, state.clubs);
       const newClub = {
-        id: req.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        id: clubId,
         name: req.name,
         category: req.category,
         summary: req.mission,
@@ -104,7 +126,7 @@ function reducer(state, action) {
         groupLink: '',
         announcementsCount: 0,
         members: [
-          { id: `${action.payload}-leader`, name: req.proposedBy, role: 'Club Leader', program: 'Club Founder' },
+          { id: `${clubId}-leader`, name: req.proposedBy, role: 'Club Leader', program: 'Club Founder' },
         ],
       };
       return {
@@ -124,6 +146,102 @@ function reducer(state, action) {
         clubRequests: state.clubRequests.filter((r) => r.id !== action.payload),
         activityLog: [logEntry(`Club proposal rejected: "${req?.name}"`, 'info'), ...state.activityLog],
         toast: { message: 'Club proposal rejected', type: 'info' },
+      };
+    }
+
+    case 'CREATE_CLUB': {
+      const draft = action.payload;
+      const clubId = uniqueClubId(draft.name, state.clubs);
+      const newClub = {
+        id: clubId,
+        name: draft.name.trim(),
+        category: draft.category.trim(),
+        summary: draft.summary.trim(),
+        leader: draft.leader.trim(),
+        accent: '#5b8def',
+        health: draft.health,
+        nextEvent: draft.nextEvent.trim() || 'Planning session pending',
+        groupPlatform: draft.groupPlatform.trim() || 'WhatsApp',
+        groupLink: draft.groupLink.trim(),
+        announcementsCount: 0,
+        members: [
+          {
+            id: `${clubId}-leader`,
+            name: draft.leader.trim(),
+            role: 'Club Leader',
+            program: 'Club Leadership',
+          },
+        ],
+      };
+
+      return {
+        ...state,
+        clubs: [newClub, ...state.clubs],
+        selectedClubId: newClub.id,
+        activityLog: [logEntry(`Club created: "${newClub.name}"`, 'club'), ...state.activityLog],
+        toast: { message: `${newClub.name} created`, type: 'success' },
+      };
+    }
+
+    case 'UPDATE_CLUB': {
+      const draft = action.payload;
+      const currentClub = state.clubs.find((club) => club.id === draft.id);
+      if (!currentClub) return state;
+
+      const nextId = uniqueClubId(draft.name, state.clubs, draft.id);
+      const updatedClub = {
+        ...currentClub,
+        id: nextId,
+        name: draft.name.trim(),
+        category: draft.category.trim(),
+        summary: draft.summary.trim(),
+        leader: draft.leader.trim(),
+        health: draft.health,
+        nextEvent: draft.nextEvent.trim() || 'Planning session pending',
+        groupPlatform: draft.groupPlatform.trim() || 'WhatsApp',
+        groupLink: draft.groupLink.trim(),
+        members: currentClub.members.map((member) =>
+          member.id === `${currentClub.id}-leader` || member.role === 'Club Leader'
+            ? { ...member, id: `${nextId}-leader`, name: draft.leader.trim() }
+            : member
+        ),
+      };
+
+      return {
+        ...state,
+        clubs: state.clubs.map((club) => (club.id === draft.id ? updatedClub : club)),
+        selectedClubId: state.selectedClubId === draft.id ? nextId : state.selectedClubId,
+        announcements: state.announcements.map((item) =>
+          item.clubId === draft.id ? { ...item, clubId: nextId } : item
+        ),
+        events: state.events.map((item) =>
+          item.clubId === draft.id ? { ...item, clubId: nextId } : item
+        ),
+        membershipRequests: state.membershipRequests.map((req) =>
+          req.clubId === draft.id ? { ...req, clubId: nextId } : req
+        ),
+        activityLog: [logEntry(`Club updated: "${updatedClub.name}"`, 'club'), ...state.activityLog],
+        toast: { message: `${updatedClub.name} updated`, type: 'success' },
+      };
+    }
+
+    case 'DELETE_CLUB': {
+      const club = state.clubs.find((item) => item.id === action.payload);
+      if (!club) return state;
+      const remainingClubs = state.clubs.filter((item) => item.id !== action.payload);
+
+      return {
+        ...state,
+        clubs: remainingClubs,
+        selectedClubId:
+          state.selectedClubId === action.payload
+            ? remainingClubs[0]?.id ?? ''
+            : state.selectedClubId,
+        announcements: state.announcements.filter((item) => item.clubId !== action.payload),
+        events: state.events.filter((item) => item.clubId !== action.payload),
+        membershipRequests: state.membershipRequests.filter((req) => req.clubId !== action.payload),
+        activityLog: [logEntry(`Club deleted: "${club.name}"`, 'club'), ...state.activityLog],
+        toast: { message: `${club.name} deleted`, type: 'info' },
       };
     }
 

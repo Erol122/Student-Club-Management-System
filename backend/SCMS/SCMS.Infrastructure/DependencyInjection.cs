@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using SCMS.Application.Clubs;
 using SCMS.Infrastructure.Persistence;
+using SCMS.Infrastructure.Persistence.Repositories;
 
 namespace SCMS.Infrastructure;
 
@@ -23,6 +25,8 @@ public static class DependencyInjection
                 sqlServerOptions.EnableRetryOnFailure();
             });
         });
+
+        services.AddScoped<IClubRepository, ClubRepository>();
 
         return services;
     }

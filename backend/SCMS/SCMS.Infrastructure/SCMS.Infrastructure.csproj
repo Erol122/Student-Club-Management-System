@@ -15,6 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\SCMS.Application\SCMS.Application.csproj" />
     <ProjectReference Include="..\SCMS.Domain\SCMS.Domain.csproj" />
   </ItemGroup>
 

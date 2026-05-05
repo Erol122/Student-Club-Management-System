@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { useMsal } from '@azure/msal-react';
 import { useAppDispatch } from '../../context/AppContext';
 
 const VIEW_LABELS = {
@@ -16,6 +17,7 @@ export const Topbar = memo(function Topbar({
   onSelectClub,
 }) {
   const dispatch = useAppDispatch();
+  const { instance } = useMsal();
   const { title, sub } = VIEW_LABELS[activeView] ?? VIEW_LABELS.home;
   const initials =
     currentUser?.avatar ??
@@ -66,7 +68,10 @@ export const Topbar = memo(function Topbar({
         <button
           type="button"
           className="logout-btn"
-          onClick={() => dispatch({ type: 'LOGOUT' })}
+          onClick={() => {
+            dispatch({ type: 'LOGOUT' });
+            instance.logoutRedirect();
+          }}
           title="Sign out"
         >
           Sign out

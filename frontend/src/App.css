@@ -790,6 +790,11 @@ textarea {
   gap: 10px;
 }
 
+.login-cards-single {
+  grid-template-columns: minmax(0, 520px);
+  justify-content: center;
+}
+
 .login-card {
   border: 1px solid rgba(255, 255, 255, 0.92);
   border-radius: 14px;
@@ -798,6 +803,10 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.login-card-wide {
+  text-align: left;
 }
 
 .login-card-avatar {
@@ -843,6 +852,14 @@ textarea {
   text-align: center;
   color: #74839a;
   font-size: 0.84rem;
+}
+
+.auth-loading {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-weight: 700;
 }
 
 .toast-wrap {

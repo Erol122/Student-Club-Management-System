@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Identity.Web;
 using SCM.Api.ErrorHandling;
 using SCMS.Application;
 using SCMS.Infrastructure;
@@ -10,6 +12,18 @@ builder.AddServiceDefaults();
 
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddApplication();
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"));
+builder.Services.AddAuthorization();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("Frontend", policy =>
+    {
+        policy.WithOrigins("http://localhost:5173")
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
 builder.Services.AddControllers();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
@@ -32,10 +46,13 @@ if (app.Environment.IsDevelopment())
 
 app.UseExceptionHandler();
 
+app.UseCors("Frontend");
+
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapControllers();
+app.MapControllers().RequireAuthorization();
 
 app.Run();

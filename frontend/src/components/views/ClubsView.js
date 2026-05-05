@@ -19,22 +19,35 @@ function ClubDetails({
   membershipRequests,
 }) {
   const dispatch = useAppDispatch();
+  const selectedClubId = selectedClub?.id ?? null;
   const clubAnnouncements = useMemo(
-    () => announcements.filter((a) => a.clubId === selectedClub.id),
-    [announcements, selectedClub.id]
+    () => announcements.filter((a) => a.clubId === selectedClubId),
+    [announcements, selectedClubId]
   );
   const clubEvents = useMemo(
     () =>
       events
-        .filter((e) => e.clubId === selectedClub.id)
+        .filter((e) => e.clubId === selectedClubId)
         .sort((a, b) => new Date(a.date) - new Date(b.date)),
-    [events, selectedClub.id]
+    [events, selectedClubId]
   );
 
-  const isMember = selectedClub.members.some((m) => m.name === currentUser?.name);
+  const isMember = selectedClub?.members.some((m) => m.name === currentUser?.name) ?? false;
   const pending = membershipRequests.some(
-    (r) => r.student === currentUser?.name && r.clubId === selectedClub.id
+    (r) => r.student === currentUser?.name && r.clubId === selectedClubId
   );
+
+  if (!selectedClub) {
+    return (
+      <SectionCard
+        className="club-detail-card"
+        title="Club details"
+        subtitle="Select a club once one is available from the backend."
+      >
+        <p className="empty-state">No club is selected right now.</p>
+      </SectionCard>
+    );
+  }
 
   return (
     <SectionCard

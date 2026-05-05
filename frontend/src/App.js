@@ -70,7 +70,7 @@ const AuthenticatedShell = memo(function AuthenticatedShell({ currentUser }) {
             />
           )}
 
-          {activeView === 'clubs' && selectedClub && (
+          {activeView === 'clubs' && (
             <ClubsView
               activeRole={activeRole}
               currentUser={currentUser}
@@ -86,7 +86,7 @@ const AuthenticatedShell = memo(function AuthenticatedShell({ currentUser }) {
             />
           )}
 
-          {activeView === 'manage' && selectedClub && (
+          {activeView === 'manage' && (
             <OperationsView
               activeRole={activeRole}
               currentUser={currentUser}

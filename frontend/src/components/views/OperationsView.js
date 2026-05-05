@@ -1,5 +1,5 @@
 import { memo, useMemo, useState } from 'react';
-import { useAppDispatch } from '../../context/AppContext';
+import { useAppDispatch, useAppState, useClubActions } from '../../context/AppContext';
 import { SectionCard } from '../common/SectionCard';
 
 const emptyAnnouncement = { title: '', body: '', audience: 'All members' };
@@ -18,6 +18,8 @@ const emptyClubRecord = {
 
 function AdminManage({ clubs, clubRequests, membershipRequests }) {
   const dispatch = useAppDispatch();
+  const { clubsLoading, clubsSaving, clubsError } = useAppState();
+  const { createClubRecord, updateClubRecord, deleteClubRecord, reloadClubs } = useClubActions();
   const [clubDraft, setClubDraft] = useState(emptyClubRecord);
   const [editingClubId, setEditingClubId] = useState(null);
 
@@ -40,18 +42,25 @@ function AdminManage({ clubs, clubRequests, membershipRequests }) {
     });
   };
 
-  const deleteClub = (club) => {
+  const deleteClub = async (club) => {
     const confirmed = window.confirm(`Delete ${club.name}? This also removes its local events, announcements, and join requests.`);
     if (!confirmed) return;
-    dispatch({ type: 'DELETE_CLUB', payload: club.id });
-    if (editingClubId === club.id) resetClubForm();
+    const deleted = await deleteClubRecord(club.id);
+    if (deleted && editingClubId === club.id) resetClubForm();
   };
 
   return (
     <div className="page-stack">
       <div className="dashboard-grid">
         <SectionCard title="Club records" subtitle="Create, update, and remove live clubs.">
+          <div className="inline-actions form-actions">
+            <button type="button" className="ghost-button" onClick={reloadClubs} disabled={clubsLoading || clubsSaving}>
+              {clubsLoading ? 'Refreshing...' : 'Refresh clubs'}
+            </button>
+          </div>
+          {clubsError ? <p className="empty-state">{clubsError}</p> : null}
           <div className="action-list">
+            {clubs.length === 0 ? <p className="empty-state">No clubs found from the backend yet.</p> : null}
             {clubs.map((club) => (
               <article key={club.id} className="action-row">
                 <div>
@@ -78,13 +87,17 @@ function AdminManage({ clubs, clubRequests, membershipRequests }) {
         >
           <form
             className="stack-form"
-            onSubmit={(e) => {
+            onSubmit={async (e) => {
               e.preventDefault();
-              dispatch({
-                type: editingClubId ? 'UPDATE_CLUB' : 'CREATE_CLUB',
-                payload: editingClubId ? { id: editingClubId, ...clubDraft } : clubDraft,
-              });
-              resetClubForm();
+              let saved = false;
+              if (editingClubId) {
+                saved = await updateClubRecord(editingClubId, clubDraft);
+              } else {
+                saved = await createClubRecord(clubDraft);
+              }
+              if (saved) {
+                resetClubForm();
+              }
             }}
           >
             <label>
@@ -157,11 +170,11 @@ function AdminManage({ clubs, clubRequests, membershipRequests }) {
               />
             </label>
             <div className="inline-actions form-actions">
-              <button type="submit" className="primary-button">
-                {editingClubId ? 'Save club' : 'Create club'}
+              <button type="submit" className="primary-button" disabled={clubsSaving}>
+                {clubsSaving ? 'Saving...' : editingClubId ? 'Save club' : 'Create club'}
               </button>
               {editingClubId ? (
-                <button type="button" className="ghost-button" onClick={resetClubForm}>
+                <button type="button" className="ghost-button" onClick={resetClubForm} disabled={clubsSaving}>
                   Cancel
                 </button>
               ) : null}
@@ -229,21 +242,26 @@ function LeaderManage({ selectedClub, membershipRequests, announcements, events 
   const [announcementDraft, setAnnouncementDraft] = useState(emptyAnnouncement);
   const [eventDraft, setEventDraft] = useState(emptyEvent);
   const [clubDraft, setClubDraft] = useState(emptyClub);
+  const selectedClubId = selectedClub?.id ?? null;
 
   const clubRequests = useMemo(
-    () => membershipRequests.filter((req) => req.clubId === selectedClub.id),
-    [membershipRequests, selectedClub.id]
+    () => membershipRequests.filter((req) => req.clubId === selectedClubId),
+    [membershipRequests, selectedClubId]
   );
   const clubAnnouncements = useMemo(
-    () => announcements.filter((item) => item.clubId === selectedClub.id),
-    [announcements, selectedClub.id]
+    () => announcements.filter((item) => item.clubId === selectedClubId),
+    [announcements, selectedClubId]
   );
   const clubEvents = useMemo(
-    () => events.filter((item) => item.clubId === selectedClub.id),
-    [events, selectedClub.id]
+    () => events.filter((item) => item.clubId === selectedClubId),
+    [events, selectedClubId]
   );
 
   const today = useMemo(() => new Date().toISOString().split('T')[0], []);
+
+  if (!selectedClub) {
+    return <p className="empty-state">No club is available to manage yet.</p>;
+  }
 
   return (
     <div className="page-stack">

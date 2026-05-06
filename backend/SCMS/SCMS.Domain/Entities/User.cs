@@ -10,6 +10,7 @@ public sealed class User : BaseEntity
     public string DisplayName { get; set; } = string.Empty;
     public string? FirstName { get; set; }
     public string? LastName { get; set; }
+    public AppRole Role { get; set; } = AppRole.Member;
     public UserStatus Status { get; set; } = UserStatus.Active;
     public DateTimeOffset? LastLoginAt { get; set; }
 

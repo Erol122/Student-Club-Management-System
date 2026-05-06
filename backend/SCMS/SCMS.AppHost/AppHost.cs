@@ -20,7 +20,7 @@ builder.AddExecutable("scms-frontend", "npm", frontendPath, "start")
     .WithHttpEndpoint(port: 5173, targetPort: 5173, env: "PORT", isProxied: false)
     .WithEnvironment("HOST", "0.0.0.0")
     .WithEnvironment("BROWSER", "none")
-    .WithEnvironment("REACT_APP_API_BASE_URL", api.GetEndpoint("http"))
+    .WithEnvironment("REACT_APP_API_BASE_URL", "http://localhost:5205")
     .WaitFor(api);
     
 builder.Build().Run();

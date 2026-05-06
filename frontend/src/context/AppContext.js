@@ -203,6 +203,18 @@ function syncSelectedClubId(selectedClubId, clubs) {
   return clubs.some((club) => club.id === selectedClubId) ? selectedClubId : clubs[0].id;
 }
 
+function ownsAnyClub(user, clubs) {
+  if (!user) return false;
+
+  return clubs.some((club) =>
+    club.members.some(
+      (member) =>
+        member.role === 'Club Leader' &&
+        (member.email === user.email || member.name === user.name)
+    )
+  );
+}
+
 const NOW = Date.now();
 
 const initialState = {
@@ -280,9 +292,16 @@ function reducer(state, action) {
       const clubs = action.payload.map((clubDto) =>
         mapApiClubToUi(clubDto, previousClubsById.get(clubDto.id) ?? null)
       );
+      const shouldDowngradeLeader =
+        state.currentUser?.role === 'Club Leader' && !ownsAnyClub(state.currentUser, clubs);
+      const currentUser = shouldDowngradeLeader
+        ? { ...state.currentUser, role: 'Member' }
+        : state.currentUser;
 
       return {
         ...state,
+        currentUser,
+        activeRole: shouldDowngradeLeader ? 'Member' : state.activeRole,
         clubs,
         clubsLoading: false,
         clubsError: null,

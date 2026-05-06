@@ -80,7 +80,8 @@ public sealed class ClubWorkflowRepository(AppDbContext dbContext) : IClubWorkfl
                 .Where(membership =>
                     membership.UserId == currentUserId &&
                     membership.Status == ClubMembershipStatus.Approved &&
-                    membership.Role == ClubMembershipRole.President)
+                    membership.Role == ClubMembershipRole.President &&
+                    membership.Club.Status == ClubStatus.Active)
                 .Select(membership => membership.ClubId)
                 .ToListAsync(cancellationToken);
 
@@ -138,7 +139,23 @@ public sealed class ClubWorkflowRepository(AppDbContext dbContext) : IClubWorkfl
                 membership.ClubId == clubId &&
                 membership.UserId == userId &&
                 membership.Status == ClubMembershipStatus.Approved &&
-                membership.Role == ClubMembershipRole.President,
+                membership.Role == ClubMembershipRole.President &&
+                membership.Club.Status == ClubStatus.Active,
+            cancellationToken);
+    }
+
+    public async Task<bool> UserOwnsAnyActiveClubAsync(
+        Guid userId,
+        Guid? excludedClubId,
+        CancellationToken cancellationToken)
+    {
+        return await dbContext.ClubMemberships.AnyAsync(
+            membership =>
+                membership.UserId == userId &&
+                (!excludedClubId.HasValue || membership.ClubId != excludedClubId.Value) &&
+                membership.Status == ClubMembershipStatus.Approved &&
+                membership.Role == ClubMembershipRole.President &&
+                membership.Club.Status == ClubStatus.Active,
             cancellationToken);
     }
 

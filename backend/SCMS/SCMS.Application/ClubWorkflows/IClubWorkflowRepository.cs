@@ -25,6 +25,11 @@ public interface IClubWorkflowRepository
 
     Task<bool> UserOwnsClubAsync(Guid clubId, Guid userId, CancellationToken cancellationToken);
 
+    Task<bool> UserOwnsAnyActiveClubAsync(
+        Guid userId,
+        Guid? excludedClubId,
+        CancellationToken cancellationToken);
+
     Task<bool> PendingJoinRequestExistsAsync(Guid clubId, Guid userId, CancellationToken cancellationToken);
 
     Task AddClubAsync(Club club, CancellationToken cancellationToken);

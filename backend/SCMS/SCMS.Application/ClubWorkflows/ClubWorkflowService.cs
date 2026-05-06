@@ -262,6 +262,32 @@ public sealed class ClubWorkflowService(IClubWorkflowRepository repository) : IC
             return ServiceResult.Failure(new ServiceError(ServiceErrorType.NotFound, "Club was not found."));
         }
 
+        var clubLeaderIds = club.Memberships
+            .Where(membership =>
+                membership.Status == ClubMembershipStatus.Approved &&
+                membership.Role == ClubMembershipRole.President &&
+                membership.User.Role == AppRole.ClubLeader)
+            .Select(membership => membership.UserId)
+            .Distinct()
+            .ToList();
+
+        foreach (var leaderId in clubLeaderIds)
+        {
+            var ownsAnotherActiveClub = await repository.UserOwnsAnyActiveClubAsync(
+                leaderId,
+                club.Id,
+                cancellationToken);
+
+            if (!ownsAnotherActiveClub)
+            {
+                var leader = club.Memberships
+                    .Select(membership => membership.User)
+                    .Single(user => user.Id == leaderId);
+
+                leader.Role = AppRole.Member;
+            }
+        }
+
         repository.RemoveClub(club);
         await repository.SaveChangesAsync(cancellationToken);
 

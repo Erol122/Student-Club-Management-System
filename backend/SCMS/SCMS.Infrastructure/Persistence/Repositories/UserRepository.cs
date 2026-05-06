@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using SCMS.Application.Common.Exceptions;
 using SCMS.Application.Users;
 using SCMS.Domain.Entities;
+using SCMS.Domain.Enums;
 
 namespace SCMS.Infrastructure.Persistence.Repositories;
 
@@ -22,6 +23,17 @@ public sealed class UserRepository(AppDbContext dbContext) : IUserRepository
 
         return await query.SingleOrDefaultAsync(
             user => user.EntraObjectId == entraObjectId,
+            cancellationToken);
+    }
+
+    public async Task<bool> UserOwnsAnyActiveClubAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        return await dbContext.ClubMemberships.AnyAsync(
+            membership =>
+                membership.UserId == userId &&
+                membership.Status == ClubMembershipStatus.Approved &&
+                membership.Role == ClubMembershipRole.President &&
+                membership.Club.Status == ClubStatus.Active,
             cancellationToken);
     }
 

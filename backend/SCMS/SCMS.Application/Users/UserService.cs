@@ -8,6 +8,7 @@ public sealed class UserService(IUserRepository userRepository) : IUserService
 {
     public async Task<CurrentUserDto> GetOrCreateCurrentUserAsync(
         CurrentUserRequest request,
+        bool repairStaleClubLeaderRole,
         CancellationToken cancellationToken)
     {
         var user = await userRepository.GetByEntraObjectIdAsync(
@@ -58,6 +59,13 @@ public sealed class UserService(IUserRepository userRepository) : IUserService
             }
         }
 
+        if (repairStaleClubLeaderRole &&
+            user.Role == AppRole.ClubLeader &&
+            !await userRepository.UserOwnsAnyActiveClubAsync(user.Id, cancellationToken))
+        {
+            user.Role = AppRole.Member;
+            await userRepository.SaveChangesAsync(cancellationToken);
+        }
 
         return ToDto(user);
     }

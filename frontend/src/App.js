@@ -1,9 +1,9 @@
-import { lazy, memo, Suspense, useEffect, useMemo } from 'react';
+import { lazy, memo, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { InteractionStatus } from '@azure/msal-browser';
 import { useIsAuthenticated, useMsal } from '@azure/msal-react';
 import './App.css';
 import { AppProvider, useAppDispatch, useAppState } from './context/AppContext';
-import { accountToUser } from './auth/authUser';
+import { apiFetch } from './api/client';
 import { Toast } from './components/common/Toast';
 import { Sidebar } from './components/layout/Sidebar';
 import { Topbar } from './components/layout/Topbar';
@@ -115,22 +115,74 @@ const AppShell = memo(function AppShell() {
   const { currentUser } = useAppState();
   const { accounts, inProgress, instance } = useMsal();
   const isAuthenticated = useIsAuthenticated();
+  const [profileState, setProfileState] = useState({ loading: false, error: null });
+  const [profileRetryKey, setProfileRetryKey] = useState(0);
+  const loadedProfileAccountId = useRef(null);
 
-  const activeAccount = instance.getActiveAccount() ?? accounts[0] ?? null;
+  const activeAccount = useMemo(
+    () => instance.getActiveAccount() ?? accounts[0] ?? null,
+    [accounts, instance]
+  );
+  const activeAccountId = activeAccount?.homeAccountId ?? activeAccount?.localAccountId ?? null;
 
   useEffect(() => {
     if (!activeAccount) return;
     instance.setActiveAccount(activeAccount);
-  }, [activeAccount, instance]);
+  }, [activeAccount, activeAccountId, instance]);
 
   useEffect(() => {
-    if (!isAuthenticated || !activeAccount) return;
+    if (!isAuthenticated || !activeAccount || !activeAccountId) return;
+    const profileLoadKey = `${activeAccountId}:${profileRetryKey}`;
+    if (loadedProfileAccountId.current === profileLoadKey) return;
 
-    const nextUser = accountToUser(activeAccount);
-    if (currentUser?.id !== nextUser.id) {
-      dispatch({ type: 'LOGIN', payload: nextUser });
-    }
-  }, [activeAccount, currentUser?.id, dispatch, isAuthenticated]);
+    let cancelled = false;
+    loadedProfileAccountId.current = profileLoadKey;
+    setProfileState({ loading: true, error: null });
+
+    apiFetch(instance, activeAccount, '/api/me')
+      .then(async (response) => {
+        if (!response.ok) {
+          const errorBody = await response.text();
+          throw new Error(
+            `GET /api/me failed with ${response.status} ${response.statusText}${
+              errorBody ? `: ${errorBody}` : ''
+            }`
+          );
+        }
+
+        return response.json();
+      })
+      .then((profile) => {
+        if (cancelled) return;
+
+        const nextUser = {
+          id: profile.id,
+          entraObjectId: profile.entraObjectId,
+          name: profile.displayName,
+          email: profile.email,
+          role: profile.role,
+          avatar: profile.displayName
+            ?.split(' ')
+            .map((part) => part[0])
+            .join('')
+            .slice(0, 2)
+            .toUpperCase(),
+          program: 'Student',
+        };
+
+        dispatch({ type: 'LOGIN', payload: nextUser });
+        setProfileState({ loading: false, error: null });
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        loadedProfileAccountId.current = null;
+        setProfileState({ loading: false, error: error.message });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeAccount, activeAccountId, dispatch, instance, isAuthenticated, profileRetryKey]);
 
   useEffect(() => {
     if (isAuthenticated || inProgress !== InteractionStatus.None || !currentUser) return;
@@ -139,6 +191,22 @@ const AppShell = memo(function AppShell() {
 
   if (inProgress !== InteractionStatus.None) {
     return <div className="auth-loading">Completing sign in...</div>;
+  }
+
+  if (isAuthenticated && profileState.loading && !currentUser) {
+    return <div className="auth-loading">Loading your profile...</div>;
+  }
+
+  if (isAuthenticated && profileState.error && !currentUser) {
+    return (
+      <div className="auth-loading auth-error">
+        <strong>Could not load your profile.</strong>
+        <span>{profileState.error}</span>
+        <button type="button" className="login-card-btn" onClick={() => setProfileRetryKey((key) => key + 1)}>
+          Retry
+        </button>
+      </div>
+    );
   }
 
   if (!isAuthenticated || !currentUser) return <LoginView />;

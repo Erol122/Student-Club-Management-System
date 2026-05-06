@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Identity.Web;
 using SCM.Api.ErrorHandling;
+using SCM.Api.Middleware;
 using SCMS.Application;
 using SCMS.Infrastructure;
 
@@ -48,9 +49,13 @@ app.UseExceptionHandler();
 
 app.UseCors("Frontend");
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseAuthentication();
+app.UseMiddleware<CurrentUserProvisioningMiddleware>();
 app.UseAuthorization();
 
 app.MapControllers().RequireAuthorization();

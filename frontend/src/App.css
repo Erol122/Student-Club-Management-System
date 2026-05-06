@@ -862,6 +862,26 @@ textarea {
   font-weight: 700;
 }
 
+.auth-error {
+  align-content: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+}
+
+.auth-error span {
+  max-width: 720px;
+  color: #6e7a90;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.auth-error .login-card-btn {
+  width: min(220px, 100%);
+}
+
 .toast-wrap {
   position: fixed;
   right: 16px;

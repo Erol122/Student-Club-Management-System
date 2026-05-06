@@ -1,7 +1,7 @@
 import { InteractionRequiredAuthError } from '@azure/msal-browser';
 import { apiScope } from '../auth/authConfig';
 
-const apiBaseUrl = process.env.REACT_APP_API_BASE_URL ?? 'https://localhost:7095';
+const apiBaseUrl = process.env.REACT_APP_API_BASE_URL ?? 'http://localhost:5205';
 
 export async function getAccessToken(instance, account) {
   const request = {

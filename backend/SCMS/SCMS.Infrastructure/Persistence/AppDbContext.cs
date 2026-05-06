@@ -9,6 +9,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 {
     public DbSet<Announcement> Announcements => Set<Announcement>();
     public DbSet<Club> Clubs => Set<Club>();
+    public DbSet<ClubCreationRequest> ClubCreationRequests => Set<ClubCreationRequest>();
     public DbSet<ClubMembership> ClubMemberships => Set<ClubMembership>();
     public DbSet<Event> Events => Set<Event>();
     public DbSet<EventResponse> EventResponses => Set<EventResponse>();

@@ -1,5 +1,5 @@
 import { memo, useMemo, useState } from 'react';
-import { useAppDispatch, useAppState, useClubActions } from '../../context/AppContext';
+import { useAppDispatch, useAppState, useClubActions, useClubCreationRequestActions } from '../../context/AppContext';
 import { SectionCard } from '../common/SectionCard';
 
 const emptyAnnouncement = { title: '', body: '', audience: 'All members' };
@@ -18,7 +18,8 @@ const emptyClubRecord = {
 
 function AdminManage({ clubs, clubRequests, membershipRequests }) {
   const dispatch = useAppDispatch();
-  const { clubsLoading, clubsSaving, clubsError } = useAppState();
+  const { clubsLoading, clubsSaving, clubsError, proposalsSaving } = useAppState();
+  const { approveProposal, rejectProposal } = useClubCreationRequestActions();
   const { createClubRecord, updateClubRecord, deleteClubRecord, reloadClubs } = useClubActions();
   const [clubDraft, setClubDraft] = useState(emptyClubRecord);
   const [editingClubId, setEditingClubId] = useState(null);
@@ -195,10 +196,10 @@ function AdminManage({ clubs, clubRequests, membershipRequests }) {
                   <span>{req.mission}</span>
                 </div>
                 <div className="inline-actions">
-                  <button type="button" className="ghost-button" onClick={() => dispatch({ type: 'REJECT_CLUB', payload: req.id })}>
+                  <button type="button" className="ghost-button" disabled={proposalsSaving} onClick={() => rejectProposal(req.id)}>
                     Reject
                   </button>
-                  <button type="button" className="primary-button" onClick={() => dispatch({ type: 'APPROVE_CLUB', payload: req.id })}>
+                  <button type="button" className="primary-button" disabled={proposalsSaving} onClick={() => approveProposal(req.id)}>
                     Approve
                   </button>
                 </div>
@@ -496,6 +497,8 @@ function LeaderManage({ selectedClub, membershipRequests, announcements, events 
 
 function MemberManage({ clubs, membershipRequests, currentUser }) {
   const dispatch = useAppDispatch();
+  const { myProposals, proposalsSaving } = useAppState();
+  const { submitProposal } = useClubCreationRequestActions();
   const [clubDraft, setClubDraft] = useState(emptyClub);
   const myClubs = useMemo(
     () => clubs.filter((club) => club.members.some((member) => member.name === currentUser?.name)),
@@ -542,13 +545,30 @@ function MemberManage({ clubs, membershipRequests, currentUser }) {
         </SectionCard>
       </div>
 
-      <SectionCard title="Create a new club" subtitle="If your idea does not exist yet, submit a proposal.">
+      <SectionCard title="My club proposals" subtitle="Proposals you have submitted for admin review.">
+        <div className="action-list">
+          {myProposals.length === 0 ? <p className="empty-state">You have not submitted any proposals yet.</p> : null}
+          {myProposals.map((req) => (
+            <article key={req.id} className="action-row">
+              <div>
+                <strong>{req.name}</strong>
+                <p>{req.category}</p>
+              </div>
+              <span className={req.status === 2 ? 'status-success' : req.status === 3 ? 'status-danger' : 'status-pending'}>
+                {req.status === 1 ? 'Pending' : req.status === 2 ? 'Approved' : req.status === 3 ? 'Rejected' : 'Cancelled'}
+              </span>
+            </article>
+          ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Propose a new club" subtitle="If your idea does not exist yet, submit a proposal for admin approval.">
         <form
           className="stack-form"
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
-            dispatch({ type: 'SUBMIT_CLUB_REQUEST', payload: clubDraft });
-            setClubDraft(emptyClub);
+            const ok = await submitProposal(clubDraft);
+            if (ok) setClubDraft(emptyClub);
           }}
         >
           <label>
@@ -557,6 +577,7 @@ function MemberManage({ clubs, membershipRequests, currentUser }) {
               value={clubDraft.name}
               onChange={(e) => setClubDraft((prev) => ({ ...prev, name: e.target.value }))}
               required
+              disabled={proposalsSaving}
             />
           </label>
           <label>
@@ -564,27 +585,22 @@ function MemberManage({ clubs, membershipRequests, currentUser }) {
             <input
               value={clubDraft.category}
               onChange={(e) => setClubDraft((prev) => ({ ...prev, category: e.target.value }))}
-              required
+              disabled={proposalsSaving}
             />
           </label>
           <label>
-            Proposed by
-            <input
-              value={clubDraft.proposedBy}
-              onChange={(e) => setClubDraft((prev) => ({ ...prev, proposedBy: e.target.value }))}
-              required
-            />
-          </label>
-          <label>
-            Mission
+            Mission / description
             <textarea
               rows="4"
               value={clubDraft.mission}
               onChange={(e) => setClubDraft((prev) => ({ ...prev, mission: e.target.value }))}
               required
+              disabled={proposalsSaving}
             />
           </label>
-          <button type="submit" className="primary-button">Submit proposal for approval</button>
+          <button type="submit" className="primary-button" disabled={proposalsSaving}>
+            {proposalsSaving ? 'Submitting...' : 'Submit proposal for approval'}
+          </button>
         </form>
       </SectionCard>
     </div>

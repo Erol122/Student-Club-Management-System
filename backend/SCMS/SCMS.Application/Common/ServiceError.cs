@@ -4,7 +4,8 @@ public enum ServiceErrorType
 {
     Validation,
     NotFound,
-    Conflict
+    Conflict,
+    Forbidden
 }
 
 public sealed record ServiceError(

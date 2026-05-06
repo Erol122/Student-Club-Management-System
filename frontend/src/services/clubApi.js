@@ -1,3 +1,5 @@
+import { apiFetch } from '../api/client';
+
 const CLUBS_API_PATH = '/api/clubs';
 
 async function parseResponse(response) {
@@ -19,37 +21,36 @@ async function parseResponse(response) {
   throw error;
 }
 
-function toJsonRequest(body, method = 'POST') {
-  return {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  };
-}
-
-export async function fetchClubs({ search, category } = {}) {
+export async function fetchClubs({ instance, account, search, category } = {}) {
   const params = new URLSearchParams();
   if (search?.trim()) params.set('search', search.trim());
   if (category?.trim() && category !== 'All') params.set('category', category.trim());
 
   const query = params.toString();
-  const response = await fetch(query ? `${CLUBS_API_PATH}?${query}` : CLUBS_API_PATH);
+  const path = query ? `${CLUBS_API_PATH}?${query}` : CLUBS_API_PATH;
+  const response = await apiFetch(instance, account, path);
   return parseResponse(response);
 }
 
-export async function createClub(payload) {
-  const response = await fetch(CLUBS_API_PATH, toJsonRequest(payload, 'POST'));
+export async function createClub({ instance, account, payload }) {
+  const response = await apiFetch(instance, account, CLUBS_API_PATH, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
   return parseResponse(response);
 }
 
-export async function updateClub(id, payload) {
-  const response = await fetch(`${CLUBS_API_PATH}/${id}`, toJsonRequest(payload, 'PUT'));
+export async function updateClub({ instance, account, id, payload }) {
+  const response = await apiFetch(instance, account, `${CLUBS_API_PATH}/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
   return parseResponse(response);
 }
 
-export async function deleteClub(id) {
-  const response = await fetch(`${CLUBS_API_PATH}/${id}`, { method: 'DELETE' });
+export async function deleteClub({ instance, account, id }) {
+  const response = await apiFetch(instance, account, `${CLUBS_API_PATH}/${id}`, {
+    method: 'DELETE',
+  });
   return parseResponse(response);
 }

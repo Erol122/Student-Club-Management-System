@@ -43,6 +43,15 @@ public sealed class ClubService(IClubRepository clubRepository) : IClubService
             return ServiceResult<ClubDto>.Failure(slugResult.Error!);
         }
 
+        var createdByUserId = NormalizeOptionalUserId(request.CreatedByUserId);
+        if (createdByUserId.HasValue &&
+            !await clubRepository.UserExistsAsync(createdByUserId.Value, cancellationToken))
+        {
+            return ServiceResult<ClubDto>.Failure(ValidationError(
+                nameof(request.CreatedByUserId),
+                "CreatedByUserId must reference an existing user."));
+        }
+
         var club = new Club
         {
             Name = request.Name.Trim(),
@@ -50,7 +59,7 @@ public sealed class ClubService(IClubRepository clubRepository) : IClubService
             Description = NormalizeOptionalText(request.Description),
             Category = NormalizeOptionalText(request.Category),
             Status = request.Status,
-            CreatedByUserId = null
+            CreatedByUserId = createdByUserId
         };
 
         await clubRepository.AddAsync(club, cancellationToken);
@@ -203,6 +212,8 @@ public sealed class ClubService(IClubRepository clubRepository) : IClubService
             club.Category,
             club.Status,
             club.CreatedByUserId,
+            club.CreatedByUser?.DisplayName,
+            club.CreatedByUser?.Email,
             club.CreatedAt,
             club.UpdatedAt);
     }

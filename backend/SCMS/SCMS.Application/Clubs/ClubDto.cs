@@ -10,5 +10,7 @@ public sealed record ClubDto(
     string? Category,
     ClubStatus Status,
     Guid? CreatedByUserId,
+    string? CreatedByUserDisplayName,
+    string? CreatedByUserEmail,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);

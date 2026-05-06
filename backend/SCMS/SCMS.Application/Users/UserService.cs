@@ -1,3 +1,4 @@
+using SCMS.Application.Common;
 using SCMS.Application.Common.Exceptions;
 using SCMS.Domain.Entities;
 using SCMS.Domain.Enums;
@@ -76,6 +77,7 @@ public sealed class UserService(IUserRepository userRepository) : IUserService
             user.DisplayName,
             user.FirstName,
             user.LastName,
+            user.Role,
             ToDisplayRole(user.Role),
             user.LastLoginAt);
     }
@@ -94,6 +96,54 @@ public sealed class UserService(IUserRepository userRepository) : IUserService
     {
         return string.IsNullOrWhiteSpace(value) ? "Unknown" : value.Trim();
     }
+
+    public async Task<IReadOnlyList<UserDto>> GetAllUsersAsync(CancellationToken cancellationToken)
+    {
+        var users = await userRepository.ListAsync(cancellationToken);
+        return users.Select(ToUserDto).ToList();
+    }
+
+    public async Task<ServiceResult<UserDto>> AssignUserRoleAsync(
+        Guid userId,
+        AppRole role,
+        CancellationToken cancellationToken)
+    {
+        if (!Enum.IsDefined(role))
+        {
+            return ServiceResult<UserDto>.Failure(new ServiceError(
+                ServiceErrorType.Validation,
+                "User data is invalid.",
+                new Dictionary<string, string[]>
+                {
+                    [nameof(role)] = ["Role is invalid."]
+                }));
+        }
+
+        var user = await userRepository.GetByIdAsync(userId, trackChanges: true, cancellationToken);
+        if (user is null)
+        {
+            return ServiceResult<UserDto>.Failure(new ServiceError(
+                ServiceErrorType.NotFound,
+                "User was not found."));
+        }
+
+        user.Role = role;
+        await userRepository.SaveChangesAsync(cancellationToken);
+
+        return ServiceResult<UserDto>.Success(ToUserDto(user));
+    }
+
+    private static UserDto ToUserDto(User user) => new(
+        user.Id,
+        user.Email,
+        user.DisplayName,
+        user.FirstName,
+        user.LastName,
+        user.Role,
+        ToDisplayRole(user.Role),
+        user.Status,
+        user.LastLoginAt,
+        user.CreatedAt);
 
     private static string? NormalizeOptional(string? value)
     {

@@ -13,7 +13,7 @@ public sealed class ClubRepository(AppDbContext dbContext) : IClubRepository
         string? category,
         CancellationToken cancellationToken)
     {
-        var query = dbContext.Clubs.AsNoTracking();
+        IQueryable<Club> query = dbContext.Clubs.AsNoTracking().Include(club => club.CreatedByUser);
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -37,7 +37,7 @@ public sealed class ClubRepository(AppDbContext dbContext) : IClubRepository
 
     public async Task<Club?> GetByIdAsync(Guid id, bool trackChanges, CancellationToken cancellationToken)
     {
-        IQueryable<Club> query = dbContext.Clubs;
+        IQueryable<Club> query = dbContext.Clubs.Include(club => club.CreatedByUser);
 
         if (!trackChanges)
         {

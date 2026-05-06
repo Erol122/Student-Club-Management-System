@@ -1,12 +1,13 @@
-import { createContext, useContext, useEffect, useReducer } from 'react';
-import {
-  initialAnnouncements,
-  initialClubRequests,
-  initialClubs,
-  initialEvents,
-  initialMembershipRequests,
-} from '../data/mockData';
+import { createContext, useContext, useEffect, useMemo, useReducer } from 'react';
+import { useMsal } from '@azure/msal-react';
 import { createClub, deleteClub, fetchClubs, updateClub } from '../services/clubApi';
+import {
+  approveClubCreationRequest,
+  fetchAllClubCreationRequests,
+  fetchMyClubCreationRequests,
+  rejectClubCreationRequest,
+  submitClubCreationRequest,
+} from '../services/clubCreationRequestApi';
 
 const fmtDate = (ts) =>
   new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short', year: 'numeric' }).format(
@@ -50,30 +51,12 @@ function slugify(value) {
     .replace(/^-+|-+$/g, '');
 }
 
-function createInitialClubLookup() {
-  const lookup = new Map();
-
-  initialClubs.forEach((club) => {
-    lookup.set(club.id, club);
-    lookup.set(club.name.toLowerCase(), club);
-  });
-
-  return lookup;
-}
-
-const initialClubLookup = createInitialClubLookup();
-
 function normalizeClubStatus(status) {
   return STATUS_LABELS[status] ?? 'Draft';
 }
 
 function getClubFallback(dto, existingClub) {
-  return (
-    existingClub ??
-    initialClubLookup.get(dto.slug?.toLowerCase?.()) ??
-    initialClubLookup.get(dto.name.toLowerCase()) ??
-    null
-  );
+  return existingClub ?? null;
 }
 
 function mapApiClubToUi(dto, existingClub = null) {
@@ -84,7 +67,8 @@ function mapApiClubToUi(dto, existingClub = null) {
     name: dto.name,
     category: dto.category ?? fallback?.category ?? 'General',
     summary: dto.description ?? fallback?.summary ?? 'No description yet.',
-    leader: fallback?.leader ?? DEFAULT_LEADER,
+    leader: dto.createdByUserDisplayName ?? fallback?.leader ?? DEFAULT_LEADER,
+    leaderEmail: dto.createdByUserEmail ?? fallback?.leaderEmail ?? null,
     accent: fallback?.accent ?? DEFAULT_ACCENT,
     health: normalizeClubStatus(dto.status),
     nextEvent: fallback?.nextEvent ?? DEFAULT_NEXT_EVENT,
@@ -96,6 +80,17 @@ function mapApiClubToUi(dto, existingClub = null) {
     status: dto.status,
     createdAt: dto.createdAt,
     updatedAt: dto.updatedAt,
+  };
+}
+
+function mapApiProposalToUi(dto) {
+  return {
+    id: dto.id,
+    name: dto.clubName,
+    category: dto.clubCategory ?? 'General',
+    proposedBy: dto.requestedByUserDisplayName,
+    mission: dto.message ?? dto.clubDescription ?? '',
+    status: dto.status,
   };
 }
 
@@ -140,29 +135,23 @@ function syncSelectedClubId(selectedClubId, clubs) {
   return clubs.some((club) => club.id === selectedClubId) ? selectedClubId : clubs[0].id;
 }
 
-const NOW = Date.now();
-
 const initialState = {
   currentUser: null,
   activeView: 'home',
   activeRole: 'Admin',
-  selectedClubId: initialClubs[0]?.id ?? '',
+  selectedClubId: '',
   clubDetailTab: 'overview',
-  clubs: initialClubs,
+  clubs: [],
   clubsLoading: false,
   clubsSaving: false,
   clubsError: null,
-  clubRequests: initialClubRequests,
-  membershipRequests: initialMembershipRequests,
-  announcements: initialAnnouncements,
-  events: initialEvents,
-  activityLog: [
-    { id: 'al-seed-1', type: 'event', message: 'Policy Debate Night scheduled for Apr 16', ts: NOW - 3_600_000 },
-    { id: 'al-seed-2', type: 'member', message: 'Arman requested to join Debate Society', ts: NOW - 7_200_000 },
-    { id: 'al-seed-3', type: 'announcement', message: 'Public speaking workshop announcement published', ts: NOW - 14_400_000 },
-    { id: 'al-seed-4', type: 'club', message: 'Entrepreneurship Circle proposal submitted', ts: NOW - 86_400_000 },
-    { id: 'al-seed-5', type: 'member', message: 'Tara requested to join Creative Media Lab', ts: NOW - 90_000_000 },
-  ],
+  clubRequests: [],
+  myProposals: [],
+  proposalsSaving: false,
+  membershipRequests: [],
+  announcements: [],
+  events: [],
+  activityLog: [],
   searchQuery: '',
   categoryFilter: 'All',
   toast: null,
@@ -187,7 +176,9 @@ function reducer(state, action) {
         currentUser: null,
         activeView: 'home',
         activeRole: 'Admin',
-        selectedClubId: syncSelectedClubId(initialClubs[0]?.id ?? '', state.clubs),
+        selectedClubId: syncSelectedClubId('', state.clubs),
+        clubRequests: [],
+        myProposals: [],
         toast: null,
       };
 
@@ -299,36 +290,61 @@ function reducer(state, action) {
         toast: { message: action.payload, type: 'info' },
       };
 
-    case 'SUBMIT_CLUB_REQUEST': {
-      const req = { id: `cr-${Date.now()}`, ...action.payload };
+    case 'LOAD_PROPOSALS_SUCCESS':
+      return { ...state, clubRequests: action.payload };
+
+    case 'LOAD_MY_PROPOSALS_SUCCESS':
+      return { ...state, myProposals: action.payload };
+
+    case 'PROPOSAL_SAVING':
+      return { ...state, proposalsSaving: action.payload };
+
+    case 'SUBMIT_PROPOSAL_SUCCESS': {
+      const proposal = action.payload;
       return {
         ...state,
-        clubRequests: [req, ...state.clubRequests],
-        activityLog: [logEntry(`Club proposal submitted: "${req.name}"`, 'club'), ...state.activityLog],
-        toast: { message: `"${req.name}" sent to admin for review`, type: 'success' },
+        proposalsSaving: false,
+        myProposals: [proposal, ...state.myProposals],
+        activityLog: [logEntry(`Club proposal submitted: "${proposal.name}"`, 'club'), ...state.activityLog],
+        toast: { message: `"${proposal.name}" sent to admin for review`, type: 'success' },
       };
     }
 
-    case 'APPROVE_CLUB': {
-      const req = state.clubRequests.find((r) => r.id === action.payload);
-      if (!req) return state;
+    case 'SUBMIT_PROPOSAL_FAILURE':
       return {
         ...state,
+        proposalsSaving: false,
+        toast: { message: action.payload, type: 'info' },
+      };
+
+    case 'APPROVE_PROPOSAL_SUCCESS': {
+      const req = state.clubRequests.find((r) => r.id === action.payload);
+      return {
+        ...state,
+        proposalsSaving: false,
         clubRequests: state.clubRequests.filter((r) => r.id !== action.payload),
-        activityLog: [logEntry(`Club approved: "${req.name}"`, 'club'), ...state.activityLog],
-        toast: { message: `${req.name} approved locally`, type: 'success' },
+        activityLog: [logEntry(`Club approved: "${req?.name}"`, 'club'), ...state.activityLog],
+        toast: { message: `${req?.name ?? 'Club'} approved`, type: 'success' },
       };
     }
 
-    case 'REJECT_CLUB': {
+    case 'REJECT_PROPOSAL_SUCCESS': {
       const req = state.clubRequests.find((r) => r.id === action.payload);
       return {
         ...state,
+        proposalsSaving: false,
         clubRequests: state.clubRequests.filter((r) => r.id !== action.payload),
         activityLog: [logEntry(`Club proposal rejected: "${req?.name}"`, 'info'), ...state.activityLog],
         toast: { message: 'Club proposal rejected', type: 'info' },
       };
     }
+
+    case 'PROPOSAL_ACTION_FAILURE':
+      return {
+        ...state,
+        proposalsSaving: false,
+        toast: { message: action.payload, type: 'info' },
+      };
 
     case 'REQUEST_MEMBERSHIP': {
       const userName = state.currentUser?.name;
@@ -470,21 +486,26 @@ function reducer(state, action) {
 
 const StateCtx = createContext(null);
 const DispatchCtx = createContext(null);
+const AuthCtx = createContext(null);
 
 export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const { instance, accounts } = useMsal();
+  const activeAccount = useMemo(
+    () => instance.getActiveAccount() ?? accounts[0] ?? null,
+    [accounts, instance]
+  );
 
+  // Load clubs whenever auth is available
   useEffect(() => {
+    if (!activeAccount) return;
     let ignore = false;
 
     async function load() {
       dispatch({ type: 'LOAD_CLUBS_START' });
-
       try {
-        const clubs = await fetchClubs();
-        if (!ignore) {
-          dispatch({ type: 'LOAD_CLUBS_SUCCESS', payload: clubs });
-        }
+        const clubs = await fetchClubs({ instance, account: activeAccount });
+        if (!ignore) dispatch({ type: 'LOAD_CLUBS_SUCCESS', payload: clubs });
       } catch (error) {
         if (!ignore) {
           dispatch({
@@ -496,11 +517,33 @@ export function AppProvider({ children }) {
     }
 
     load();
+    return () => { ignore = true; };
+  }, [activeAccount, instance]);
 
-    return () => {
-      ignore = true;
-    };
-  }, []);
+  // Load proposals based on role whenever user changes
+  useEffect(() => {
+    if (!activeAccount || !state.currentUser) return;
+    let ignore = false;
+
+    async function loadProposals() {
+      try {
+        if (state.activeRole === 'Admin') {
+          // Admin sees all pending proposals
+          const all = await fetchAllClubCreationRequests({ instance, account: activeAccount, status: 1 });
+          if (!ignore) dispatch({ type: 'LOAD_PROPOSALS_SUCCESS', payload: all.map(mapApiProposalToUi) });
+        } else {
+          // Members see their own proposals
+          const mine = await fetchMyClubCreationRequests({ instance, account: activeAccount });
+          if (!ignore) dispatch({ type: 'LOAD_MY_PROPOSALS_SUCCESS', payload: mine.map(mapApiProposalToUi) });
+        }
+      } catch {
+        // silently fail — state keeps previous data
+      }
+    }
+
+    loadProposals();
+    return () => { ignore = true; };
+  }, [activeAccount, instance, state.currentUser?.id, state.activeRole]);
 
   useEffect(() => {
     if (!state.toast) return;
@@ -510,7 +553,11 @@ export function AppProvider({ children }) {
 
   return (
     <StateCtx.Provider value={state}>
-      <DispatchCtx.Provider value={dispatch}>{children}</DispatchCtx.Provider>
+      <DispatchCtx.Provider value={dispatch}>
+        <AuthCtx.Provider value={{ instance, account: activeAccount }}>
+          {children}
+        </AuthCtx.Provider>
+      </DispatchCtx.Provider>
     </StateCtx.Provider>
   );
 }
@@ -523,16 +570,20 @@ export function useAppDispatch() {
   return useContext(DispatchCtx);
 }
 
+function useAuth() {
+  return useContext(AuthCtx);
+}
+
 export function useClubActions() {
   const dispatch = useAppDispatch();
   const { clubs } = useAppState();
+  const { instance, account } = useAuth();
 
   return {
     async reloadClubs() {
       dispatch({ type: 'LOAD_CLUBS_START' });
-
       try {
-        const clubList = await fetchClubs();
+        const clubList = await fetchClubs({ instance, account });
         dispatch({ type: 'LOAD_CLUBS_SUCCESS', payload: clubList });
       } catch (error) {
         dispatch({
@@ -544,9 +595,8 @@ export function useClubActions() {
 
     async createClubRecord(draft) {
       dispatch({ type: 'SAVE_CLUB_START' });
-
       try {
-        const savedClub = await createClub(mapUiClubToCreateRequest(draft));
+        const savedClub = await createClub({ instance, account, payload: mapUiClubToCreateRequest(draft) });
         dispatch({ type: 'CREATE_CLUB_SUCCESS', payload: savedClub });
         return true;
       } catch (error) {
@@ -560,10 +610,9 @@ export function useClubActions() {
 
     async updateClubRecord(id, draft) {
       dispatch({ type: 'SAVE_CLUB_START' });
-
       try {
         const currentClub = clubs.find((club) => club.id === id) ?? null;
-        const savedClub = await updateClub(id, mapUiClubToUpdateRequest(draft, currentClub));
+        const savedClub = await updateClub({ instance, account, id, payload: mapUiClubToUpdateRequest(draft, currentClub) });
         dispatch({ type: 'UPDATE_CLUB_SUCCESS', payload: savedClub });
         return true;
       } catch (error) {
@@ -577,9 +626,8 @@ export function useClubActions() {
 
     async deleteClubRecord(id) {
       dispatch({ type: 'SAVE_CLUB_START' });
-
       try {
-        await deleteClub(id);
+        await deleteClub({ instance, account, id });
         dispatch({ type: 'DELETE_CLUB_SUCCESS', payload: id });
         return true;
       } catch (error) {
@@ -588,6 +636,81 @@ export function useClubActions() {
           payload: buildFieldError(error.body) || error.message,
         });
         return false;
+      }
+    },
+  };
+}
+
+export function useClubCreationRequestActions() {
+  const dispatch = useAppDispatch();
+  const { instance, account } = useAuth();
+
+  return {
+    async submitProposal(draft) {
+      dispatch({ type: 'PROPOSAL_SAVING', payload: true });
+      try {
+        const dto = await submitClubCreationRequest({
+          instance,
+          account,
+          payload: {
+            clubName: draft.name?.trim(),
+            clubDescription: draft.mission?.trim() || null,
+            clubCategory: draft.category?.trim() || null,
+            message: draft.mission?.trim() || null,
+          },
+        });
+        dispatch({ type: 'SUBMIT_PROPOSAL_SUCCESS', payload: mapApiProposalToUi(dto) });
+        return true;
+      } catch (error) {
+        dispatch({
+          type: 'SUBMIT_PROPOSAL_FAILURE',
+          payload: error.body?.detail || error.message || 'Could not submit proposal.',
+        });
+        return false;
+      }
+    },
+
+    async approveProposal(requestId) {
+      dispatch({ type: 'PROPOSAL_SAVING', payload: true });
+      try {
+        await approveClubCreationRequest({ instance, account, requestId, reviewNote: null });
+        dispatch({ type: 'APPROVE_PROPOSAL_SUCCESS', payload: requestId });
+        return true;
+      } catch (error) {
+        dispatch({
+          type: 'PROPOSAL_ACTION_FAILURE',
+          payload: error.body?.detail || error.message || 'Could not approve proposal.',
+        });
+        return false;
+      }
+    },
+
+    async rejectProposal(requestId) {
+      dispatch({ type: 'PROPOSAL_SAVING', payload: true });
+      try {
+        await rejectClubCreationRequest({ instance, account, requestId, reviewNote: null });
+        dispatch({ type: 'REJECT_PROPOSAL_SUCCESS', payload: requestId });
+        return true;
+      } catch (error) {
+        dispatch({
+          type: 'PROPOSAL_ACTION_FAILURE',
+          payload: error.body?.detail || error.message || 'Could not reject proposal.',
+        });
+        return false;
+      }
+    },
+
+    async reloadProposals(role) {
+      try {
+        if (role === 'Admin') {
+          const all = await fetchAllClubCreationRequests({ instance, account, status: 1 });
+          dispatch({ type: 'LOAD_PROPOSALS_SUCCESS', payload: all.map(mapApiProposalToUi) });
+        } else {
+          const mine = await fetchMyClubCreationRequests({ instance, account });
+          dispatch({ type: 'LOAD_MY_PROPOSALS_SUCCESS', payload: mine.map(mapApiProposalToUi) });
+        }
+      } catch {
+        // silently fail
       }
     },
   };

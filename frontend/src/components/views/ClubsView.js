@@ -53,7 +53,14 @@ function ClubDetails({
     <SectionCard
       className="club-detail-card"
       title={selectedClub.name}
-      subtitle={`${selectedClub.category} · Led by ${selectedClub.leader}`}
+      subtitle={
+        <span>
+          {selectedClub.category} · Led by {selectedClub.leader}
+          {selectedClub.leaderEmail && (
+            <> · <a href={`mailto:${selectedClub.leaderEmail}`} className="leader-email">{selectedClub.leaderEmail}</a></>
+          )}
+        </span>
+      }
       actions={
         selectedClub.groupLink ? (
           <a
@@ -271,8 +278,15 @@ export const ClubsView = memo(function ClubsView({
                   <p>{club.summary}</p>
                   <div className="directory-card-meta">
                     <span>{club.members.length} members</span>
-                    <span>{club.leader}</span>
+                    <span>Led by {club.leader}</span>
                   </div>
+                  {club.leaderEmail && (
+                    <div className="directory-card-leader-email">
+                      <a href={`mailto:${club.leaderEmail}`} onClick={(e) => e.stopPropagation()}>
+                        {club.leaderEmail}
+                      </a>
+                    </div>
+                  )}
 
                   {activeRole === 'Member' ? (
                     <button

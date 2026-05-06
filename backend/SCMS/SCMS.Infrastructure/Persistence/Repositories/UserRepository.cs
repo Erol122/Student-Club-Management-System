@@ -8,6 +8,18 @@ namespace SCMS.Infrastructure.Persistence.Repositories;
 
 public sealed class UserRepository(AppDbContext dbContext) : IUserRepository
 {
+    public async Task<User?> GetByIdAsync(Guid id, bool trackChanges, CancellationToken cancellationToken)
+    {
+        IQueryable<User> query = dbContext.Users;
+
+        if (!trackChanges)
+        {
+            query = query.AsNoTracking();
+        }
+
+        return await query.SingleOrDefaultAsync(user => user.Id == id, cancellationToken);
+    }
+
     public async Task<User?> GetByEntraObjectIdAsync(
         string entraObjectId,
         bool trackChanges,
@@ -25,6 +37,14 @@ public sealed class UserRepository(AppDbContext dbContext) : IUserRepository
             cancellationToken);
     }
 
+    public async Task<IReadOnlyList<User>> ListAsync(CancellationToken cancellationToken)
+    {
+        return await dbContext.Users
+            .AsNoTracking()
+            .OrderBy(user => user.DisplayName)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task AddAsync(User user, CancellationToken cancellationToken)
     {
         await dbContext.Users.AddAsync(user, cancellationToken);
@@ -34,6 +54,19 @@ public sealed class UserRepository(AppDbContext dbContext) : IUserRepository
     {
         try
         {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            // Two concurrent requests (e.g. MSAL token refresh + API call) both hit the
+            // middleware user-provisioning upsert simultaneously. The loser gets a RowVersion
+            // mismatch. Refresh the stale entries from the DB and retry once.
+            foreach (var entry in ex.Entries)
+            {
+                var dbValues = await entry.GetDatabaseValuesAsync(cancellationToken);
+                if (dbValues is not null)
+                    entry.OriginalValues.SetValues(dbValues);
+            }
             await dbContext.SaveChangesAsync(cancellationToken);
         }
         catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))

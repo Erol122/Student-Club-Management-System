@@ -1,12 +1,11 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SCMS.Application.Clubs;
-using SCMS.Application.Common;
 
 namespace SCM.Api.Controllers;
 
-[ApiController]
 [Route("api/[controller]")]
-public sealed class ClubsController(IClubService clubService) : ControllerBase
+public sealed class ClubsController(IClubService clubService) : ApiControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<ClubDto>>> GetClubs(
@@ -26,82 +25,41 @@ public sealed class ClubsController(IClubService clubService) : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = "ClubLeaderOrAdmin")]
     public async Task<ActionResult<ClubDto>> CreateClub(
         CreateClubRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await clubService.CreateClubAsync(request, cancellationToken);
-        if (!result.Succeeded)
-        {
-            return ToActionResult(result.Error!);
-        }
+        var currentUser = GetCurrentUser();
+        if (currentUser is null) return Unauthorized();
+
+        var requestWithUser = request with { CreatedByUserId = currentUser.Id };
+        var result = await clubService.CreateClubAsync(requestWithUser, cancellationToken);
+        if (!result.Succeeded) return ToActionResult(result.Error!);
 
         return CreatedAtAction(nameof(GetClub), new { id = result.Value!.Id }, result.Value);
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = "ClubLeaderOrAdmin")]
     public async Task<ActionResult<ClubDto>> UpdateClub(
         Guid id,
         UpdateClubRequest request,
         CancellationToken cancellationToken)
     {
         var result = await clubService.UpdateClubAsync(id, request, cancellationToken);
-        if (!result.Succeeded)
-        {
-            return ToActionResult(result.Error!);
-        }
+        if (!result.Succeeded) return ToActionResult(result.Error!);
 
         return Ok(result.Value);
     }
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<IActionResult> DeleteClub(Guid id, CancellationToken cancellationToken)
     {
         var result = await clubService.DeleteClubAsync(id, cancellationToken);
-        if (!result.Succeeded)
-        {
-            return ToActionResult(result.Error!);
-        }
+        if (!result.Succeeded) return ToActionResult(result.Error!);
 
         return NoContent();
-    }
-
-    private ActionResult ToActionResult(ServiceError error)
-    {
-        return error.Type switch
-        {
-            ServiceErrorType.Validation => ToValidationProblem(error),
-            ServiceErrorType.NotFound => NotFound(new ProblemDetails
-            {
-                Title = "Resource not found",
-                Detail = error.Message,
-                Status = StatusCodes.Status404NotFound,
-                Instance = HttpContext.Request.Path
-            }),
-            ServiceErrorType.Conflict => Conflict(new ProblemDetails
-            {
-                Title = "Conflict",
-                Detail = error.Message,
-                Status = StatusCodes.Status409Conflict,
-                Instance = HttpContext.Request.Path
-            }),
-            _ => Problem(error.Message)
-        };
-    }
-
-    private ActionResult ToValidationProblem(ServiceError error)
-    {
-        if (error.Errors is not null)
-        {
-            foreach (var (field, messages) in error.Errors)
-            {
-                foreach (var message in messages)
-                {
-                    ModelState.AddModelError(field, message);
-                }
-            }
-        }
-
-        return ValidationProblem(ModelState);
     }
 }

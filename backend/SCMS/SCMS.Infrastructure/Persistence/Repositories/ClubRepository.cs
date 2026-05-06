@@ -3,6 +3,7 @@ using Microsoft.Data.SqlClient;
 using SCMS.Application.Clubs;
 using SCMS.Application.Common.Exceptions;
 using SCMS.Domain.Entities;
+using SCMS.Domain.Enums;
 
 namespace SCMS.Infrastructure.Persistence.Repositories;
 
@@ -13,7 +14,12 @@ public sealed class ClubRepository(AppDbContext dbContext) : IClubRepository
         string? category,
         CancellationToken cancellationToken)
     {
-        var query = dbContext.Clubs.AsNoTracking();
+        var query = dbContext.Clubs
+            .AsNoTracking()
+            .Include(club => club.Memberships.Where(membership =>
+                membership.Status == ClubMembershipStatus.Approved))
+            .ThenInclude(membership => membership.User)
+            .Where(club => club.Status == ClubStatus.Active);
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -37,7 +43,10 @@ public sealed class ClubRepository(AppDbContext dbContext) : IClubRepository
 
     public async Task<Club?> GetByIdAsync(Guid id, bool trackChanges, CancellationToken cancellationToken)
     {
-        IQueryable<Club> query = dbContext.Clubs;
+        IQueryable<Club> query = dbContext.Clubs
+            .Include(club => club.Memberships.Where(membership =>
+                membership.Status == ClubMembershipStatus.Approved))
+            .ThenInclude(membership => membership.User);
 
         if (!trackChanges)
         {

@@ -1,9 +1,17 @@
-const CLUBS_API_PATH = '/api/clubs';
+import { apiFetch } from '../api/client';
 
-async function parseResponse(response) {
+const CLUBS_API_PATH = '/api/clubs';
+const CLUB_PROPOSALS_API_PATH = '/api/club-proposals';
+const JOIN_REQUESTS_API_PATH = '/api/join-requests';
+
+export async function parseResponse(response) {
   const contentType = response.headers.get('content-type') ?? '';
-  const isJson = contentType.includes('application/json');
-  const body = isJson ? await response.json() : await response.text();
+  const hasBody = response.status !== 204;
+  const body = hasBody
+    ? contentType.includes('application/json')
+      ? await response.json()
+      : await response.text()
+    : null;
 
   if (response.ok) {
     return body;
@@ -29,27 +37,84 @@ function toJsonRequest(body, method = 'POST') {
   };
 }
 
-export async function fetchClubs({ search, category } = {}) {
+export async function fetchClubs(auth, { search, category } = {}) {
   const params = new URLSearchParams();
   if (search?.trim()) params.set('search', search.trim());
   if (category?.trim() && category !== 'All') params.set('category', category.trim());
 
   const query = params.toString();
-  const response = await fetch(query ? `${CLUBS_API_PATH}?${query}` : CLUBS_API_PATH);
+  const response = await apiFetch(
+    auth.instance,
+    auth.account,
+    query ? `${CLUBS_API_PATH}?${query}` : CLUBS_API_PATH
+  );
   return parseResponse(response);
 }
 
-export async function createClub(payload) {
-  const response = await fetch(CLUBS_API_PATH, toJsonRequest(payload, 'POST'));
+export async function createClub(auth, payload) {
+  const response = await apiFetch(auth.instance, auth.account, CLUBS_API_PATH, toJsonRequest(payload, 'POST'));
   return parseResponse(response);
 }
 
-export async function updateClub(id, payload) {
-  const response = await fetch(`${CLUBS_API_PATH}/${id}`, toJsonRequest(payload, 'PUT'));
+export async function updateClub(auth, id, payload) {
+  const response = await apiFetch(auth.instance, auth.account, `${CLUBS_API_PATH}/${id}`, toJsonRequest(payload, 'PUT'));
   return parseResponse(response);
 }
 
-export async function deleteClub(id) {
-  const response = await fetch(`${CLUBS_API_PATH}/${id}`, { method: 'DELETE' });
+export async function deleteClub(auth, id) {
+  const response = await apiFetch(auth.instance, auth.account, `${CLUBS_API_PATH}/${id}`, { method: 'DELETE' });
+  return parseResponse(response);
+}
+
+export async function fetchClubProposals(auth) {
+  const response = await apiFetch(auth.instance, auth.account, `${CLUB_PROPOSALS_API_PATH}/pending`);
+  return parseResponse(response);
+}
+
+export async function submitClubProposal(auth, payload) {
+  const response = await apiFetch(auth.instance, auth.account, CLUB_PROPOSALS_API_PATH, toJsonRequest(payload, 'POST'));
+  return parseResponse(response);
+}
+
+export async function approveClubProposal(auth, id) {
+  const response = await apiFetch(auth.instance, auth.account, `${CLUB_PROPOSALS_API_PATH}/${id}/approve`, {
+    method: 'POST',
+  });
+  return parseResponse(response);
+}
+
+export async function rejectClubProposal(auth, id) {
+  const response = await apiFetch(auth.instance, auth.account, `${CLUB_PROPOSALS_API_PATH}/${id}/reject`, {
+    method: 'POST',
+  });
+  return parseResponse(response);
+}
+
+export async function fetchJoinRequests(auth) {
+  const response = await apiFetch(auth.instance, auth.account, `${JOIN_REQUESTS_API_PATH}/pending`);
+  return parseResponse(response);
+}
+
+export async function submitJoinRequest(auth, clubId, message) {
+  const response = await apiFetch(
+    auth.instance,
+    auth.account,
+    `${CLUBS_API_PATH}/${clubId}/join-requests`,
+    toJsonRequest({ message }, 'POST')
+  );
+  return parseResponse(response);
+}
+
+export async function approveJoinRequest(auth, id) {
+  const response = await apiFetch(auth.instance, auth.account, `${JOIN_REQUESTS_API_PATH}/${id}/approve`, {
+    method: 'POST',
+  });
+  return parseResponse(response);
+}
+
+export async function rejectJoinRequest(auth, id) {
+  const response = await apiFetch(auth.instance, auth.account, `${JOIN_REQUESTS_API_PATH}/${id}/reject`, {
+    method: 'POST',
+  });
   return parseResponse(response);
 }

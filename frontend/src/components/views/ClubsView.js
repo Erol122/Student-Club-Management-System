@@ -1,5 +1,5 @@
 import { memo, useMemo } from 'react';
-import { useAppDispatch } from '../../context/AppContext';
+import { useAppDispatch, useClubActions } from '../../context/AppContext';
 import { SectionCard } from '../common/SectionCard';
 
 const TABS = [
@@ -32,9 +32,9 @@ function ClubDetails({
     [events, selectedClubId]
   );
 
-  const isMember = selectedClub?.members.some((m) => m.name === currentUser?.name) ?? false;
+  const isMember = selectedClub?.members.some((m) => m.email === currentUser?.email || m.name === currentUser?.name) ?? false;
   const pending = membershipRequests.some(
-    (r) => r.student === currentUser?.name && r.clubId === selectedClubId
+    (r) => (r.email === currentUser?.email || r.student === currentUser?.name) && r.clubId === selectedClubId
   );
 
   if (!selectedClub) {
@@ -185,6 +185,7 @@ export const ClubsView = memo(function ClubsView({
   categoryFilter,
 }) {
   const dispatch = useAppDispatch();
+  const { requestMembershipRecord } = useClubActions();
   const categories = useMemo(() => ['All', ...new Set(clubs.map((club) => club.category))], [clubs]);
 
   const filteredClubs = useMemo(() => {
@@ -205,13 +206,17 @@ export const ClubsView = memo(function ClubsView({
   }, [clubs, searchQuery, categoryFilter]);
 
   const memberClubIds = useMemo(
-    () => clubs.filter((club) => club.members.some((member) => member.name === currentUser?.name)).map((club) => club.id),
-    [clubs, currentUser?.name]
+    () => clubs.filter((club) =>
+      club.members.some((member) => member.email === currentUser?.email || member.name === currentUser?.name)
+    ).map((club) => club.id),
+    [clubs, currentUser?.email, currentUser?.name]
   );
 
   const pendingClubIds = useMemo(
-    () => membershipRequests.filter((req) => req.student === currentUser?.name).map((req) => req.clubId),
-    [membershipRequests, currentUser?.name]
+    () => membershipRequests
+      .filter((req) => req.email === currentUser?.email || req.student === currentUser?.name)
+      .map((req) => req.clubId),
+    [membershipRequests, currentUser?.email, currentUser?.name]
   );
 
   return (
@@ -279,9 +284,9 @@ export const ClubsView = memo(function ClubsView({
                       type="button"
                       className={`primary-button ${isMember || isPending ? 'is-muted' : ''}`.trim()}
                       disabled={isMember || isPending}
-                      onClick={(e) => {
+                      onClick={async (e) => {
                         e.stopPropagation();
-                        dispatch({ type: 'REQUEST_MEMBERSHIP', payload: club.id });
+                        await requestMembershipRecord(club.id);
                       }}
                     >
                       {isMember ? 'Already a member' : isPending ? 'Request pending' : 'Request to join'}

@@ -2,7 +2,7 @@ import { lazy, memo, Suspense, useEffect, useMemo, useRef, useState } from 'reac
 import { InteractionStatus } from '@azure/msal-browser';
 import { useIsAuthenticated, useMsal } from '@azure/msal-react';
 import './App.css';
-import { AppProvider, useAppDispatch, useAppState } from './context/AppContext';
+import { AppProvider, useAppDispatch, useAppState, useClubActions } from './context/AppContext';
 import { apiFetch } from './api/client';
 import { Toast } from './components/common/Toast';
 import { Sidebar } from './components/layout/Sidebar';
@@ -16,6 +16,7 @@ const OperationsView = lazy(() => import('./components/views/OperationsView').th
 
 const AuthenticatedShell = memo(function AuthenticatedShell({ currentUser }) {
   const dispatch = useAppDispatch();
+  const { reloadWorkspace } = useClubActions();
   const {
     activeView,
     activeRole,
@@ -37,6 +38,10 @@ const AuthenticatedShell = memo(function AuthenticatedShell({ currentUser }) {
   );
 
   const pendingCount = clubRequests.length + membershipRequests.length;
+
+  useEffect(() => {
+    reloadWorkspace();
+  }, [currentUser.id]);
 
   return (
     <div className="app-shell">

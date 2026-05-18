@@ -1,11 +1,6 @@
 import { createContext, useContext, useEffect, useReducer } from 'react';
 import { useMsal } from '@azure/msal-react';
 import {
-  initialAnnouncements,
-  initialClubs,
-  initialEvents,
-} from '../data/mockData';
-import {
   approveClubProposal,
   approveJoinRequest,
   createClub,
@@ -72,30 +67,12 @@ function slugify(value) {
     .replace(/^-+|-+$/g, '');
 }
 
-function createInitialClubLookup() {
-  const lookup = new Map();
-
-  initialClubs.forEach((club) => {
-    lookup.set(club.id, club);
-    lookup.set(club.name.toLowerCase(), club);
-  });
-
-  return lookup;
-}
-
-const initialClubLookup = createInitialClubLookup();
-
 function normalizeClubStatus(status) {
   return STATUS_LABELS[status] ?? 'Draft';
 }
 
 function getClubFallback(dto, existingClub) {
-  return (
-    existingClub ??
-    initialClubLookup.get(dto.slug?.toLowerCase?.()) ??
-    initialClubLookup.get(dto.name.toLowerCase()) ??
-    null
-  );
+  return existingClub;
 }
 
 function mapApiClubToUi(dto, existingClub = null) {
@@ -119,8 +96,8 @@ function mapApiClubToUi(dto, existingClub = null) {
     accent: fallback?.accent ?? DEFAULT_ACCENT,
     health: normalizeClubStatus(dto.status),
     nextEvent: fallback?.nextEvent ?? DEFAULT_NEXT_EVENT,
-    groupPlatform: fallback?.groupPlatform ?? DEFAULT_GROUP_PLATFORM,
-    groupLink: fallback?.groupLink ?? '',
+    groupPlatform: dto.groupPlatform ?? fallback?.groupPlatform ?? DEFAULT_GROUP_PLATFORM,
+    groupLink: dto.groupLink ?? fallback?.groupLink ?? '',
     announcementsCount: fallback?.announcementsCount ?? 0,
     members,
     slug: dto.slug,
@@ -169,6 +146,8 @@ function mapUiClubToCreateRequest(draft) {
     description: draft.summary.trim(),
     category: draft.category.trim(),
     status: STATUS_VALUES[draft.health] ?? STATUS_VALUES.Active,
+    groupPlatform: draft.groupPlatform.trim(),
+    groupLink: draft.groupLink.trim(),
   };
 }
 
@@ -180,6 +159,8 @@ function mapUiClubToUpdateRequest(draft, currentClub) {
     category: draft.category.trim(),
     status: STATUS_VALUES[draft.health] ?? STATUS_VALUES[currentClub?.health] ?? STATUS_VALUES.Active,
     createdByUserId: null,
+    groupPlatform: draft.groupPlatform.trim(),
+    groupLink: draft.groupLink.trim(),
   };
 }
 
@@ -215,29 +196,21 @@ function ownsAnyClub(user, clubs) {
   );
 }
 
-const NOW = Date.now();
-
 const initialState = {
   currentUser: null,
   activeView: 'home',
   activeRole: 'Admin',
-  selectedClubId: initialClubs[0]?.id ?? '',
+  selectedClubId: '',
   clubDetailTab: 'overview',
-  clubs: initialClubs,
+  clubs: [],
   clubsLoading: false,
   clubsSaving: false,
   clubsError: null,
   clubRequests: [],
   membershipRequests: [],
-  announcements: initialAnnouncements,
-  events: initialEvents,
-  activityLog: [
-    { id: 'al-seed-1', type: 'event', message: 'Policy Debate Night scheduled for Apr 16', ts: NOW - 3_600_000 },
-    { id: 'al-seed-2', type: 'member', message: 'Arman requested to join Debate Society', ts: NOW - 7_200_000 },
-    { id: 'al-seed-3', type: 'announcement', message: 'Public speaking workshop announcement published', ts: NOW - 14_400_000 },
-    { id: 'al-seed-4', type: 'club', message: 'Entrepreneurship Circle proposal submitted', ts: NOW - 86_400_000 },
-    { id: 'al-seed-5', type: 'member', message: 'Tara requested to join Creative Media Lab', ts: NOW - 90_000_000 },
-  ],
+  announcements: [],
+  events: [],
+  activityLog: [],
   searchQuery: '',
   categoryFilter: 'All',
   toast: null,
@@ -262,7 +235,7 @@ function reducer(state, action) {
         currentUser: null,
         activeView: 'home',
         activeRole: 'Admin',
-        selectedClubId: syncSelectedClubId(initialClubs[0]?.id ?? '', state.clubs),
+        selectedClubId: syncSelectedClubId('', state.clubs),
         toast: null,
       };
 
@@ -314,6 +287,10 @@ function reducer(state, action) {
         ...state,
         clubsLoading: false,
         clubsError: action.payload,
+        clubs: [],
+        selectedClubId: '',
+        clubRequests: [],
+        membershipRequests: [],
         toast: { message: action.payload, type: 'info' },
       };
 

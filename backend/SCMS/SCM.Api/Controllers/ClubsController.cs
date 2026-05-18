@@ -38,12 +38,7 @@ public sealed class ClubsController(
             return Unauthorized();
         }
 
-        if (!string.Equals(currentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase))
-        {
-            return Forbid();
-        }
-
-        var result = await clubService.CreateClubAsync(request, cancellationToken);
+        var result = await clubService.CreateClubAsync(currentUser, request, cancellationToken);
         if (!result.Succeeded)
         {
             return ToActionResult(result.Error!);
@@ -63,12 +58,7 @@ public sealed class ClubsController(
             return Unauthorized();
         }
 
-        if (!string.Equals(currentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase))
-        {
-            return Forbid();
-        }
-
-        var result = await clubService.UpdateClubAsync(id, request, cancellationToken);
+        var result = await clubService.UpdateClubAsync(currentUser, id, request, cancellationToken);
         if (!result.Succeeded)
         {
             return ToActionResult(result.Error!);

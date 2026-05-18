@@ -9,45 +9,43 @@ namespace SCMS.Infrastructure.Persistence.Repositories;
 
 public sealed class ClubWorkflowRepository(AppDbContext dbContext) : IClubWorkflowRepository
 {
-    public async Task<User?> GetUserByIdAsync(Guid id, bool trackChanges, CancellationToken cancellationToken)
+    public async Task<User?> GetUserByIdForUpdateAsync(Guid id, CancellationToken cancellationToken)
     {
-        IQueryable<User> query = dbContext.Users;
-
-        if (!trackChanges)
-        {
-            query = query.AsNoTracking();
-        }
-
-        return await query.SingleOrDefaultAsync(user => user.Id == id, cancellationToken);
+        return await dbContext.Users.SingleOrDefaultAsync(user => user.Id == id, cancellationToken);
     }
 
-    public async Task<Club?> GetClubByIdAsync(Guid id, bool trackChanges, CancellationToken cancellationToken)
+    public async Task<bool> UserExistsAsync(Guid id, CancellationToken cancellationToken)
     {
-        IQueryable<Club> query = dbContext.Clubs
+        return await dbContext.Users.AnyAsync(user => user.Id == id, cancellationToken);
+    }
+
+    public async Task<Club?> GetClubByIdAsync(Guid id, CancellationToken cancellationToken)
+    {
+        return await ClubWithMembers()
+            .AsNoTracking()
+            .SingleOrDefaultAsync(club => club.Id == id, cancellationToken);
+    }
+
+    public async Task<Club?> GetClubByIdForUpdateAsync(Guid id, CancellationToken cancellationToken)
+    {
+        return await ClubWithMembers()
+            .SingleOrDefaultAsync(club => club.Id == id, cancellationToken);
+    }
+
+    private IQueryable<Club> ClubWithMembers()
+    {
+        return dbContext.Clubs
             .Include(club => club.CreatedByUser)
             .Include(club => club.Memberships)
             .ThenInclude(membership => membership.User);
-
-        if (!trackChanges)
-        {
-            query = query.AsNoTracking();
-        }
-
-        return await query.SingleOrDefaultAsync(club => club.Id == id, cancellationToken);
     }
 
-    public async Task<Club?> GetClubProposalByIdAsync(Guid id, bool trackChanges, CancellationToken cancellationToken)
+    public async Task<Club?> GetClubProposalByIdForUpdateAsync(Guid id, CancellationToken cancellationToken)
     {
-        IQueryable<Club> query = dbContext.Clubs
+        return await dbContext.Clubs
             .Include(club => club.CreatedByUser)
-            .Include(club => club.Memberships);
-
-        if (!trackChanges)
-        {
-            query = query.AsNoTracking();
-        }
-
-        return await query.SingleOrDefaultAsync(
+            .Include(club => club.Memberships)
+            .SingleOrDefaultAsync(
             club => club.Id == id && club.Status == ClubStatus.Draft,
             cancellationToken);
     }
@@ -95,21 +93,14 @@ public sealed class ClubWorkflowRepository(AppDbContext dbContext) : IClubWorkfl
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<JoinRequest?> GetJoinRequestByIdAsync(
+    public async Task<JoinRequest?> GetJoinRequestByIdForUpdateAsync(
         Guid id,
-        bool trackChanges,
         CancellationToken cancellationToken)
     {
-        IQueryable<JoinRequest> query = dbContext.JoinRequests
+        return await dbContext.JoinRequests
             .Include(joinRequest => joinRequest.Club)
-            .Include(joinRequest => joinRequest.User);
-
-        if (!trackChanges)
-        {
-            query = query.AsNoTracking();
-        }
-
-        return await query.SingleOrDefaultAsync(joinRequest => joinRequest.Id == id, cancellationToken);
+            .Include(joinRequest => joinRequest.User)
+            .SingleOrDefaultAsync(joinRequest => joinRequest.Id == id, cancellationToken);
     }
 
     public async Task<bool> SlugExistsAsync(string slug, CancellationToken cancellationToken)

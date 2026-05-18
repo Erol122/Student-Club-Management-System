@@ -8,4 +8,7 @@ public sealed record CurrentUserDto(
     string? FirstName,
     string? LastName,
     string Role,
-    DateTimeOffset? LastLoginAt);
+    DateTimeOffset? LastLoginAt)
+{
+    public bool IsAdmin => string.Equals(Role, "Admin", StringComparison.OrdinalIgnoreCase);
+}

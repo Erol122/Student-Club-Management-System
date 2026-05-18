@@ -9,19 +9,11 @@ namespace SCMS.Infrastructure.Persistence.Repositories;
 
 public sealed class UserRepository(AppDbContext dbContext) : IUserRepository
 {
-    public async Task<User?> GetByEntraObjectIdAsync(
+    public async Task<User?> GetByEntraObjectIdForUpdateAsync(
         string entraObjectId,
-        bool trackChanges,
         CancellationToken cancellationToken)
     {
-        IQueryable<User> query = dbContext.Users;
-
-        if (!trackChanges)
-        {
-            query = query.AsNoTracking();
-        }
-
-        return await query.SingleOrDefaultAsync(
+        return await dbContext.Users.SingleOrDefaultAsync(
             user => user.EntraObjectId == entraObjectId,
             cancellationToken);
     }

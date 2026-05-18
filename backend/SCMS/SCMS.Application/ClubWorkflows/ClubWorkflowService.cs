@@ -19,7 +19,7 @@ public sealed class ClubWorkflowService(IClubWorkflowRepository repository) : IC
             return ServiceResult<ClubProposalDto>.Failure(validationError);
         }
 
-        var proposer = await repository.GetUserByIdAsync(currentUser.Id, trackChanges: true, cancellationToken);
+        var proposer = await repository.GetUserByIdForUpdateAsync(currentUser.Id, cancellationToken);
         if (proposer is null)
         {
             return NotFound<ClubProposalDto>("Current user was not found.");
@@ -39,29 +39,17 @@ public sealed class ClubWorkflowService(IClubWorkflowRepository repository) : IC
         }
 
         var now = DateTimeOffset.UtcNow;
-        var club = new Club
-        {
-            Name = request.Name.Trim(),
-            Slug = slug,
-            Description = request.Mission.Trim(),
-            Category = NormalizeOptionalText(request.Category),
-            Status = ClubStatus.Draft,
-            CreatedByUserId = proposer.Id,
-            CreatedByUser = proposer
-        };
+        var club = Club.Propose(
+            request.Name.Trim(),
+            slug,
+            request.Mission.Trim(),
+            NormalizeOptionalText(request.Category),
+            proposer);
 
         await repository.AddClubAsync(club, cancellationToken);
-        await repository.SaveChangesAsync(cancellationToken);
-
-        await repository.AddClubMembershipAsync(new ClubMembership
-        {
-            ClubId = club.Id,
-            UserId = proposer.Id,
-            Role = ClubMembershipRole.President,
-            Status = ClubMembershipStatus.Pending,
-            JoinedAt = now
-        }, cancellationToken);
-
+        await repository.AddClubMembershipAsync(
+            ClubMembership.CreatePendingPresident(club, proposer, now),
+            cancellationToken);
         await repository.SaveChangesAsync(cancellationToken);
 
         return ServiceResult<ClubProposalDto>.Success(ToProposalDto(club));
@@ -71,7 +59,7 @@ public sealed class ClubWorkflowService(IClubWorkflowRepository repository) : IC
         CurrentUserDto currentUser,
         CancellationToken cancellationToken)
     {
-        if (!IsAdmin(currentUser))
+        if (!currentUser.IsAdmin)
         {
             return ServiceResult<IReadOnlyList<ClubProposalDto>>.Success([]);
         }
@@ -86,12 +74,12 @@ public sealed class ClubWorkflowService(IClubWorkflowRepository repository) : IC
         Guid clubId,
         CancellationToken cancellationToken)
     {
-        if (!IsAdmin(currentUser))
+        if (!currentUser.IsAdmin)
         {
             return Forbidden<ClubProposalDto>();
         }
 
-        var club = await repository.GetClubProposalByIdAsync(clubId, trackChanges: true, cancellationToken);
+        var club = await repository.GetClubProposalByIdForUpdateAsync(clubId, cancellationToken);
         if (club is null)
         {
             return NotFound<ClubProposalDto>("Club proposal was not found.");
@@ -109,17 +97,13 @@ public sealed class ClubWorkflowService(IClubWorkflowRepository repository) : IC
                 "Club proposal has no proposer to assign as owner."));
         }
 
-        var owner = await repository.GetUserByIdAsync(club.CreatedByUserId.Value, trackChanges: true, cancellationToken);
+        var owner = await repository.GetUserByIdForUpdateAsync(club.CreatedByUserId.Value, cancellationToken);
         if (owner is null)
         {
             return NotFound<ClubProposalDto>("Club proposer was not found.");
         }
 
-        club.Status = ClubStatus.Active;
-        if (owner.Role != AppRole.Admin)
-        {
-            owner.Role = AppRole.ClubLeader;
-        }
+        club.ApproveProposal(owner);
 
         await UpsertMembershipAsync(
             club.Id,
@@ -140,12 +124,12 @@ public sealed class ClubWorkflowService(IClubWorkflowRepository repository) : IC
         Guid clubId,
         CancellationToken cancellationToken)
     {
-        if (!IsAdmin(currentUser))
+        if (!currentUser.IsAdmin)
         {
             return Forbidden<ClubProposalDto>();
         }
 
-        var club = await repository.GetClubProposalByIdAsync(clubId, trackChanges: true, cancellationToken);
+        var club = await repository.GetClubProposalByIdForUpdateAsync(clubId, cancellationToken);
         if (club is null)
         {
             return NotFound<ClubProposalDto>("Club proposal was not found.");
@@ -156,7 +140,7 @@ public sealed class ClubWorkflowService(IClubWorkflowRepository repository) : IC
             return Conflict<ClubProposalDto>("Only pending club proposals can be rejected.");
         }
 
-        club.Status = ClubStatus.Archived;
+        club.RejectProposal();
         if (club.CreatedByUserId.HasValue)
         {
             await UpsertMembershipAsync(
@@ -178,14 +162,13 @@ public sealed class ClubWorkflowService(IClubWorkflowRepository repository) : IC
         SubmitJoinRequestRequest request,
         CancellationToken cancellationToken)
     {
-        var club = await repository.GetClubByIdAsync(clubId, trackChanges: false, cancellationToken);
+        var club = await repository.GetClubByIdAsync(clubId, cancellationToken);
         if (club is null || club.Status != ClubStatus.Active)
         {
             return NotFound<JoinRequestDto>("Club was not found.");
         }
 
-        var user = await repository.GetUserByIdAsync(currentUser.Id, trackChanges: false, cancellationToken);
-        if (user is null)
+        if (!await repository.UserExistsAsync(currentUser.Id, cancellationToken))
         {
             return NotFound<JoinRequestDto>("Current user was not found.");
         }
@@ -200,21 +183,16 @@ public sealed class ClubWorkflowService(IClubWorkflowRepository repository) : IC
             return Conflict<JoinRequestDto>("You already have a pending request for this club.");
         }
 
-        var joinRequest = new JoinRequest
-        {
-            ClubId = club.Id,
-            UserId = user.Id,
-            Status = JoinRequestStatus.Pending,
-            Message = NormalizeOptionalText(request.Message),
-            SubmittedAt = DateTimeOffset.UtcNow,
-            Club = club,
-            User = user
-        };
+        var joinRequest = JoinRequest.Submit(
+            club.Id,
+            currentUser.Id,
+            NormalizeOptionalText(request.Message),
+            DateTimeOffset.UtcNow);
 
         await repository.AddJoinRequestAsync(joinRequest, cancellationToken);
         await repository.SaveChangesAsync(cancellationToken);
 
-        return ServiceResult<JoinRequestDto>.Success(ToJoinRequestDto(joinRequest));
+        return ServiceResult<JoinRequestDto>.Success(ToJoinRequestDto(joinRequest, club.Name, currentUser));
     }
 
     public async Task<ServiceResult<IReadOnlyList<JoinRequestDto>>> GetPendingJoinRequestsAsync(
@@ -223,7 +201,7 @@ public sealed class ClubWorkflowService(IClubWorkflowRepository repository) : IC
     {
         var requests = await repository.ListPendingJoinRequestsAsync(
             currentUser.Id,
-            IsAdmin(currentUser),
+            currentUser.IsAdmin,
             cancellationToken);
 
         return ServiceResult<IReadOnlyList<JoinRequestDto>>.Success(
@@ -251,12 +229,12 @@ public sealed class ClubWorkflowService(IClubWorkflowRepository repository) : IC
         Guid clubId,
         CancellationToken cancellationToken)
     {
-        if (!IsAdmin(currentUser))
+        if (!currentUser.IsAdmin)
         {
             return ServiceResult.Failure(ForbiddenError());
         }
 
-        var club = await repository.GetClubByIdAsync(clubId, trackChanges: true, cancellationToken);
+        var club = await repository.GetClubByIdForUpdateAsync(clubId, cancellationToken);
         if (club is null)
         {
             return ServiceResult.Failure(new ServiceError(ServiceErrorType.NotFound, "Club was not found."));
@@ -284,7 +262,7 @@ public sealed class ClubWorkflowService(IClubWorkflowRepository repository) : IC
                     .Select(membership => membership.User)
                     .Single(user => user.Id == leaderId);
 
-                leader.Role = AppRole.Member;
+                leader.DemoteToMember();
             }
         }
 
@@ -300,13 +278,13 @@ public sealed class ClubWorkflowService(IClubWorkflowRepository repository) : IC
         JoinRequestStatus nextStatus,
         CancellationToken cancellationToken)
     {
-        var joinRequest = await repository.GetJoinRequestByIdAsync(requestId, trackChanges: true, cancellationToken);
+        var joinRequest = await repository.GetJoinRequestByIdForUpdateAsync(requestId, cancellationToken);
         if (joinRequest is null)
         {
             return NotFound<JoinRequestDto>("Join request was not found.");
         }
 
-        var canReview = IsAdmin(currentUser) ||
+        var canReview = currentUser.IsAdmin ||
             await repository.UserOwnsClubAsync(joinRequest.ClubId, currentUser.Id, cancellationToken);
         if (!canReview)
         {
@@ -318,9 +296,14 @@ public sealed class ClubWorkflowService(IClubWorkflowRepository repository) : IC
             return Conflict<JoinRequestDto>("Only pending join requests can be reviewed.");
         }
 
-        joinRequest.Status = nextStatus;
-        joinRequest.ReviewedByUserId = currentUser.Id;
-        joinRequest.ReviewedAt = DateTimeOffset.UtcNow;
+        if (nextStatus == JoinRequestStatus.Approved)
+        {
+            joinRequest.Approve(currentUser.Id, DateTimeOffset.UtcNow);
+        }
+        else
+        {
+            joinRequest.Reject(currentUser.Id, DateTimeOffset.UtcNow);
+        }
 
         if (nextStatus == JoinRequestStatus.Approved)
         {
@@ -346,25 +329,30 @@ public sealed class ClubWorkflowService(IClubWorkflowRepository repository) : IC
         Guid approvedByUserId,
         CancellationToken cancellationToken)
     {
-        var club = await repository.GetClubByIdAsync(clubId, trackChanges: true, cancellationToken);
+        var club = await repository.GetClubByIdForUpdateAsync(clubId, cancellationToken);
         var existingMembership = club?.Memberships.SingleOrDefault(membership => membership.UserId == userId);
         if (existingMembership is null)
         {
-            await repository.AddClubMembershipAsync(new ClubMembership
-            {
-                ClubId = clubId,
-                UserId = userId,
-                Role = role,
-                Status = status,
-                JoinedAt = DateTimeOffset.UtcNow,
-                ApprovedByUserId = approvedByUserId
-            }, cancellationToken);
+            await repository.AddClubMembershipAsync(
+                ClubMembership.CreateReviewed(
+                    clubId,
+                    userId,
+                    role,
+                    status,
+                    approvedByUserId,
+                    DateTimeOffset.UtcNow),
+                cancellationToken);
             return;
         }
 
-        existingMembership.Role = role;
-        existingMembership.Status = status;
-        existingMembership.ApprovedByUserId = approvedByUserId;
+        if (status == ClubMembershipStatus.Approved)
+        {
+            existingMembership.ApproveAs(role, approvedByUserId);
+        }
+        else
+        {
+            existingMembership.RejectAs(role, approvedByUserId);
+        }
     }
 
     private static ClubProposalDto ToProposalDto(Club club)
@@ -392,6 +380,25 @@ public sealed class ClubWorkflowService(IClubWorkflowRepository repository) : IC
             joinRequest.UserId,
             joinRequest.User.DisplayName,
             joinRequest.User.Email,
+            "Student",
+            joinRequest.Message,
+            joinRequest.Status,
+            joinRequest.SubmittedAt,
+            joinRequest.ReviewedAt);
+    }
+
+    private static JoinRequestDto ToJoinRequestDto(
+        JoinRequest joinRequest,
+        string clubName,
+        CurrentUserDto currentUser)
+    {
+        return new JoinRequestDto(
+            joinRequest.Id,
+            joinRequest.ClubId,
+            clubName,
+            joinRequest.UserId,
+            currentUser.DisplayName,
+            currentUser.Email,
             "Student",
             joinRequest.Message,
             joinRequest.Status,
@@ -462,11 +469,6 @@ public sealed class ClubWorkflowService(IClubWorkflowRepository repository) : IC
         return new ServiceError(
             ServiceErrorType.Forbidden,
             "You do not have permission to perform this action.");
-    }
-
-    private static bool IsAdmin(CurrentUserDto currentUser)
-    {
-        return string.Equals(currentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string NormalizeSlug(string value)

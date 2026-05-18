@@ -1,4 +1,5 @@
 using SCMS.Application.Common;
+using SCMS.Application.Users;
 
 namespace SCMS.Application.Clubs;
 
@@ -12,13 +13,13 @@ public interface IClubService
     Task<ClubDto?> GetClubAsync(Guid id, CancellationToken cancellationToken);
 
     Task<ServiceResult<ClubDto>> CreateClubAsync(
+        CurrentUserDto currentUser,
         CreateClubRequest request,
         CancellationToken cancellationToken);
 
     Task<ServiceResult<ClubDto>> UpdateClubAsync(
+        CurrentUserDto currentUser,
         Guid id,
         UpdateClubRequest request,
         CancellationToken cancellationToken);
-
-    Task<ServiceResult> DeleteClubAsync(Guid id, CancellationToken cancellationToken);
 }

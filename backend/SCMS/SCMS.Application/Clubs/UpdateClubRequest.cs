@@ -8,4 +8,6 @@ public sealed record UpdateClubRequest(
     string? Description,
     string? Category,
     ClubStatus Status,
-    Guid? CreatedByUserId = null);
+    Guid? CreatedByUserId = null,
+    string? GroupPlatform = null,
+    string? GroupLink = null);

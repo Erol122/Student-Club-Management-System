@@ -1,4 +1,4 @@
-import { memo, useMemo } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { useAppDispatch, useClubActions } from '../../context/AppContext';
 import { SectionCard } from '../common/SectionCard';
 
@@ -14,9 +14,6 @@ function ClubDetails({
   clubDetailTab,
   announcements,
   events,
-  currentUser,
-  activeRole,
-  membershipRequests,
 }) {
   const dispatch = useAppDispatch();
   const selectedClubId = selectedClub?.id ?? null;
@@ -30,11 +27,6 @@ function ClubDetails({
         .filter((e) => e.clubId === selectedClubId)
         .sort((a, b) => new Date(a.date) - new Date(b.date)),
     [events, selectedClubId]
-  );
-
-  const isMember = selectedClub?.members.some((m) => m.email === currentUser?.email || m.name === currentUser?.name) ?? false;
-  const pending = membershipRequests.some(
-    (r) => (r.email === currentUser?.email || r.student === currentUser?.name) && r.clubId === selectedClubId
   );
 
   if (!selectedClub) {
@@ -158,15 +150,6 @@ function ClubDetails({
         </div>
       )}
 
-      {activeRole === 'Member' && (
-        <div className="member-note">
-          {isMember
-            ? 'You are already a member of this club.'
-            : pending
-            ? 'Your join request is pending review.'
-            : 'Want to join? Use the request button on the club card.'}
-        </div>
-      )}
     </SectionCard>
   );
 }
@@ -186,10 +169,11 @@ export const ClubsView = memo(function ClubsView({
 }) {
   const dispatch = useAppDispatch();
   const { requestMembershipRecord } = useClubActions();
+  const [memberView, setMemberView] = useState('my-clubs');
   const categories = useMemo(() => ['All', ...new Set(clubs.map((club) => club.category))], [clubs]);
 
-  const filteredClubs = useMemo(() => {
-    let result = clubs;
+  const filterClubs = useCallback((clubList) => {
+    let result = clubList;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(
@@ -203,7 +187,12 @@ export const ClubsView = memo(function ClubsView({
       result = result.filter((club) => club.category === categoryFilter);
     }
     return result;
-  }, [clubs, searchQuery, categoryFilter]);
+  }, [categoryFilter, searchQuery]);
+
+  const filteredClubs = useMemo(
+    () => filterClubs(clubs),
+    [clubs, filterClubs]
+  );
 
   const memberClubIds = useMemo(
     () => clubs.filter((club) =>
@@ -212,12 +201,143 @@ export const ClubsView = memo(function ClubsView({
     [clubs, currentUser?.email, currentUser?.name]
   );
 
+  const memberClubs = useMemo(
+    () => clubs.filter((club) => memberClubIds.includes(club.id)),
+    [clubs, memberClubIds]
+  );
+
+  const selectedMemberClub = useMemo(
+    () => memberClubs.find((club) => club.id === selectedClubId) ?? memberClubs[0] ?? null,
+    [memberClubs, selectedClubId]
+  );
+
   const pendingClubIds = useMemo(
     () => membershipRequests
       .filter((req) => req.email === currentUser?.email || req.student === currentUser?.name)
       .map((req) => req.clubId),
     [membershipRequests, currentUser?.email, currentUser?.name]
   );
+
+  const joinableClubs = useMemo(
+    () => filterClubs(clubs.filter((club) => !memberClubIds.includes(club.id))),
+    [clubs, filterClubs, memberClubIds]
+  );
+
+  if (activeRole === 'Member') {
+    const showMyClubs = memberView === 'my-clubs';
+
+    return (
+      <div className="page-stack">
+        <div className="club-view-tabs">
+          <button
+            type="button"
+            className={`tab-btn ${showMyClubs ? 'active' : ''}`.trim()}
+            onClick={() => setMemberView('my-clubs')}
+          >
+            My clubs
+          </button>
+          <button
+            type="button"
+            className={`tab-btn ${!showMyClubs ? 'active' : ''}`.trim()}
+            onClick={() => setMemberView('join-clubs')}
+          >
+            Join clubs
+          </button>
+        </div>
+
+        {showMyClubs ? (
+          <>
+            {memberClubs.length > 1 ? (
+              <label className="member-club-picker">
+                Current club
+                <select
+                  value={selectedMemberClub?.id ?? ''}
+                  onChange={(e) => dispatch({ type: 'SELECT_CLUB', payload: e.target.value })}
+                >
+                  {memberClubs.map((club) => (
+                    <option key={club.id} value={club.id}>
+                      {club.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+
+            {selectedMemberClub ? (
+              <ClubDetails
+                selectedClub={selectedMemberClub}
+                clubDetailTab={clubDetailTab}
+                announcements={announcements}
+                events={events}
+              />
+            ) : (
+              <SectionCard title="My clubs" subtitle="Clubs you belong to will appear here.">
+                <p className="empty-state">You are not a member of any clubs yet.</p>
+              </SectionCard>
+            )}
+          </>
+        ) : (
+          <>
+            <section className="search-row">
+              <input
+                className="search-input"
+                placeholder="Search clubs by name, category, or leader..."
+                value={searchQuery}
+                onChange={(e) => dispatch({ type: 'SET_SEARCH', payload: e.target.value })}
+              />
+            </section>
+
+            <div className="filter-chips">
+              {categories.map((category) => (
+                <button
+                  key={category}
+                  type="button"
+                  className={`filter-chip ${categoryFilter === category ? 'active' : ''}`.trim()}
+                  onClick={() => dispatch({ type: 'SET_CATEGORY', payload: category })}
+                >
+                  {category}
+                </button>
+              ))}
+            </div>
+
+            <SectionCard
+              title="Join clubs"
+              subtitle={`${joinableClubs.length} club${joinableClubs.length === 1 ? '' : 's'} available`}
+            >
+              <div className="directory-grid member-join-grid">
+                {joinableClubs.length === 0 ? <p className="empty-state">No clubs available to join right now.</p> : null}
+                {joinableClubs.map((club) => {
+                  const isPending = pendingClubIds.includes(club.id);
+
+                  return (
+                    <article key={club.id} className="directory-card">
+                      <div className="directory-card-top">
+                        <span className="directory-category">{club.category}</span>
+                      </div>
+                      <h4>{club.name}</h4>
+                      <p>{club.summary}</p>
+                      <div className="directory-card-meta">
+                        <span>{club.members.length} members</span>
+                        <span>{club.leader}</span>
+                      </div>
+                      <button
+                        type="button"
+                        className={`primary-button ${isPending ? 'is-muted' : ''}`.trim()}
+                        disabled={isPending}
+                        onClick={() => requestMembershipRecord(club.id)}
+                      >
+                        {isPending ? 'Request pending' : 'Request to join'}
+                      </button>
+                    </article>
+                  );
+                })}
+              </div>
+            </SectionCard>
+          </>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="page-stack">
@@ -303,9 +423,6 @@ export const ClubsView = memo(function ClubsView({
           clubDetailTab={clubDetailTab}
           announcements={announcements}
           events={events}
-          membershipRequests={membershipRequests}
-          currentUser={currentUser}
-          activeRole={activeRole}
         />
       </div>
     </div>

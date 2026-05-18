@@ -9,7 +9,9 @@ public interface IClubRepository
         string? category,
         CancellationToken cancellationToken);
 
-    Task<Club?> GetByIdAsync(Guid id, bool trackChanges, CancellationToken cancellationToken);
+    Task<Club?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
+
+    Task<Club?> GetByIdForUpdateAsync(Guid id, CancellationToken cancellationToken);
 
     Task<bool> SlugExistsAsync(
         string slug,

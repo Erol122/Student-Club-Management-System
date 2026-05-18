@@ -60,6 +60,57 @@ function AdminManage({ clubs, clubRequests, membershipRequests }) {
   return (
     <div className="page-stack">
       <div className="dashboard-grid">
+        <SectionCard title="Club proposals" subtitle="Approve new student club ideas.">
+          <div className="action-list">
+            {clubRequests.length === 0 ? <p className="empty-state">No club proposals pending.</p> : null}
+            {clubRequests.map((req) => (
+              <article key={req.id} className="action-row">
+                <div>
+                  <strong>{req.name}</strong>
+                  <p>{req.category} · proposed by {req.proposedBy}</p>
+                  <span>{req.mission}</span>
+                </div>
+                <div className="inline-actions">
+                  <button type="button" className="ghost-button" onClick={() => rejectClubProposalRecord(req.id)} disabled={clubsSaving}>
+                    Reject
+                  </button>
+                  <button type="button" className="primary-button" onClick={() => approveClubProposalRecord(req.id)} disabled={clubsSaving}>
+                    Approve
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Membership approvals" subtitle="Review student join requests.">
+          <div className="action-list">
+            {membershipRequests.length === 0 ? <p className="empty-state">No membership requests pending.</p> : null}
+            {membershipRequests.map((req) => {
+              const club = clubs.find((c) => c.id === req.clubId);
+              return (
+                <article key={req.id} className="action-row">
+                  <div>
+                    <strong>{req.student}</strong>
+                    <p>{req.program} · {club?.name ?? req.clubId}</p>
+                    <span>{req.reason}</span>
+                  </div>
+                  <div className="inline-actions">
+                    <button type="button" className="ghost-button" onClick={() => rejectMembershipRecord(req.id)} disabled={clubsSaving}>
+                      Decline
+                    </button>
+                    <button type="button" className="primary-button" onClick={() => approveMembershipRecord(req.id)} disabled={clubsSaving}>
+                      Approve
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </SectionCard>
+      </div>
+
+      <div className="dashboard-grid">
         <SectionCard title="Club records" subtitle="Create, update, and remove live clubs.">
           <div className="inline-actions form-actions">
             <button type="button" className="ghost-button" onClick={reloadClubs} disabled={clubsLoading || clubsSaving}>
@@ -134,18 +185,6 @@ function AdminManage({ clubs, clubRequests, membershipRequests }) {
               />
             </label>
             <label>
-              Health
-              <select
-                value={clubDraft.health}
-                onChange={(e) => setClubDraft((prev) => ({ ...prev, health: e.target.value }))}
-              >
-                <option>Excellent</option>
-                <option>Active</option>
-                <option>Growing</option>
-                <option>Needs attention</option>
-              </select>
-            </label>
-            <label>
               Summary
               <textarea
                 rows="3"
@@ -188,57 +227,6 @@ function AdminManage({ clubs, clubRequests, membershipRequests }) {
               ) : null}
             </div>
           </form>
-        </SectionCard>
-      </div>
-
-      <div className="dashboard-grid">
-        <SectionCard title="Club proposals" subtitle="Approve new student club ideas.">
-          <div className="action-list">
-            {clubRequests.length === 0 ? <p className="empty-state">No club proposals pending.</p> : null}
-            {clubRequests.map((req) => (
-              <article key={req.id} className="action-row">
-                <div>
-                  <strong>{req.name}</strong>
-                  <p>{req.category} · proposed by {req.proposedBy}</p>
-                  <span>{req.mission}</span>
-                </div>
-                <div className="inline-actions">
-                  <button type="button" className="ghost-button" onClick={() => rejectClubProposalRecord(req.id)} disabled={clubsSaving}>
-                    Reject
-                  </button>
-                  <button type="button" className="primary-button" onClick={() => approveClubProposalRecord(req.id)} disabled={clubsSaving}>
-                    Approve
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
-        </SectionCard>
-
-        <SectionCard title="Membership approvals" subtitle="Review student join requests.">
-          <div className="action-list">
-            {membershipRequests.length === 0 ? <p className="empty-state">No membership requests pending.</p> : null}
-            {membershipRequests.map((req) => {
-              const club = clubs.find((c) => c.id === req.clubId);
-              return (
-                <article key={req.id} className="action-row">
-                  <div>
-                    <strong>{req.student}</strong>
-                    <p>{req.program} · {club?.name ?? req.clubId}</p>
-                    <span>{req.reason}</span>
-                  </div>
-                  <div className="inline-actions">
-                    <button type="button" className="ghost-button" onClick={() => rejectMembershipRecord(req.id)} disabled={clubsSaving}>
-                      Decline
-                    </button>
-                    <button type="button" className="primary-button" onClick={() => approveMembershipRecord(req.id)} disabled={clubsSaving}>
-                      Approve
-                    </button>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
         </SectionCard>
       </div>
     </div>

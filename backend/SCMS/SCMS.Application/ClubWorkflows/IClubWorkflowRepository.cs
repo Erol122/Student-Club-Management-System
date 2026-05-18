@@ -4,11 +4,15 @@ namespace SCMS.Application.ClubWorkflows;
 
 public interface IClubWorkflowRepository
 {
-    Task<User?> GetUserByIdAsync(Guid id, bool trackChanges, CancellationToken cancellationToken);
+    Task<User?> GetUserByIdForUpdateAsync(Guid id, CancellationToken cancellationToken);
 
-    Task<Club?> GetClubByIdAsync(Guid id, bool trackChanges, CancellationToken cancellationToken);
+    Task<bool> UserExistsAsync(Guid id, CancellationToken cancellationToken);
 
-    Task<Club?> GetClubProposalByIdAsync(Guid id, bool trackChanges, CancellationToken cancellationToken);
+    Task<Club?> GetClubByIdAsync(Guid id, CancellationToken cancellationToken);
+
+    Task<Club?> GetClubByIdForUpdateAsync(Guid id, CancellationToken cancellationToken);
+
+    Task<Club?> GetClubProposalByIdForUpdateAsync(Guid id, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<Club>> ListPendingClubProposalsAsync(CancellationToken cancellationToken);
 
@@ -17,7 +21,7 @@ public interface IClubWorkflowRepository
         bool includeAllClubs,
         CancellationToken cancellationToken);
 
-    Task<JoinRequest?> GetJoinRequestByIdAsync(Guid id, bool trackChanges, CancellationToken cancellationToken);
+    Task<JoinRequest?> GetJoinRequestByIdForUpdateAsync(Guid id, CancellationToken cancellationToken);
 
     Task<bool> SlugExistsAsync(string slug, CancellationToken cancellationToken);
 

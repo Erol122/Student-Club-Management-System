@@ -41,19 +41,25 @@ public sealed class ClubRepository(AppDbContext dbContext) : IClubRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<Club?> GetByIdAsync(Guid id, bool trackChanges, CancellationToken cancellationToken)
+    public async Task<Club?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
     {
-        IQueryable<Club> query = dbContext.Clubs
+        return await ClubWithApprovedMembers()
+            .AsNoTracking()
+            .SingleOrDefaultAsync(club => club.Id == id, cancellationToken);
+    }
+
+    public async Task<Club?> GetByIdForUpdateAsync(Guid id, CancellationToken cancellationToken)
+    {
+        return await ClubWithApprovedMembers()
+            .SingleOrDefaultAsync(club => club.Id == id, cancellationToken);
+    }
+
+    private IQueryable<Club> ClubWithApprovedMembers()
+    {
+        return dbContext.Clubs
             .Include(club => club.Memberships.Where(membership =>
                 membership.Status == ClubMembershipStatus.Approved))
             .ThenInclude(membership => membership.User);
-
-        if (!trackChanges)
-        {
-            query = query.AsNoTracking();
-        }
-
-        return await query.SingleOrDefaultAsync(club => club.Id == id, cancellationToken);
     }
 
     public async Task<bool> SlugExistsAsync(

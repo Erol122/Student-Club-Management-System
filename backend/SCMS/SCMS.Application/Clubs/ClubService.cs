@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using SCMS.Application.Common;
+using SCMS.Application.Users;
 using SCMS.Domain.Entities;
 using SCMS.Domain.Enums;
 
@@ -18,19 +19,27 @@ public sealed class ClubService(IClubRepository clubRepository) : IClubService
 
     public async Task<ClubDto?> GetClubAsync(Guid id, CancellationToken cancellationToken)
     {
-        var club = await clubRepository.GetByIdAsync(id, trackChanges: false, cancellationToken);
+        var club = await clubRepository.GetByIdAsync(id, cancellationToken);
         return club is null ? null : ToDto(club);
     }
 
     public async Task<ServiceResult<ClubDto>> CreateClubAsync(
+        CurrentUserDto currentUser,
         CreateClubRequest request,
         CancellationToken cancellationToken)
     {
+        if (!currentUser.IsAdmin)
+        {
+            return ServiceResult<ClubDto>.Failure(ForbiddenError());
+        }
+
         var validationError = ValidateRequest(
             request.Name,
             request.Slug,
             request.Description,
             request.Category,
+            request.GroupPlatform,
+            request.GroupLink,
             request.Status);
         if (validationError is not null)
         {
@@ -43,15 +52,15 @@ public sealed class ClubService(IClubRepository clubRepository) : IClubService
             return ServiceResult<ClubDto>.Failure(slugResult.Error!);
         }
 
-        var club = new Club
-        {
-            Name = request.Name.Trim(),
-            Slug = slugResult.Value!,
-            Description = NormalizeOptionalText(request.Description),
-            Category = NormalizeOptionalText(request.Category),
-            Status = request.Status,
-            CreatedByUserId = null
-        };
+        var club = Club.CreateManaged(
+            request.Name.Trim(),
+            slugResult.Value!,
+            NormalizeOptionalText(request.Description),
+            NormalizeOptionalText(request.Category),
+            NormalizeOptionalText(request.GroupPlatform),
+            NormalizeOptionalText(request.GroupLink),
+            request.Status,
+            createdByUserId: null);
 
         await clubRepository.AddAsync(club, cancellationToken);
         await clubRepository.SaveChangesAsync(cancellationToken);
@@ -60,22 +69,30 @@ public sealed class ClubService(IClubRepository clubRepository) : IClubService
     }
 
     public async Task<ServiceResult<ClubDto>> UpdateClubAsync(
+        CurrentUserDto currentUser,
         Guid id,
         UpdateClubRequest request,
         CancellationToken cancellationToken)
     {
+        if (!currentUser.IsAdmin)
+        {
+            return ServiceResult<ClubDto>.Failure(ForbiddenError());
+        }
+
         var validationError = ValidateRequest(
             request.Name,
             request.Slug,
             request.Description,
             request.Category,
+            request.GroupPlatform,
+            request.GroupLink,
             request.Status);
         if (validationError is not null)
         {
             return ServiceResult<ClubDto>.Failure(validationError);
         }
 
-        var club = await clubRepository.GetByIdAsync(id, trackChanges: true, cancellationToken);
+        var club = await clubRepository.GetByIdForUpdateAsync(id, cancellationToken);
         if (club is null)
         {
             return ServiceResult<ClubDto>.Failure(new ServiceError(
@@ -98,32 +115,19 @@ public sealed class ClubService(IClubRepository clubRepository) : IClubService
                 "CreatedByUserId must reference an existing user."));
         }
 
-        club.Name = request.Name.Trim();
-        club.Slug = slugResult.Value!;
-        club.Description = NormalizeOptionalText(request.Description);
-        club.Category = NormalizeOptionalText(request.Category);
-        club.Status = request.Status;
-        club.CreatedByUserId = createdByUserId;
+        club.UpdateDetails(
+            request.Name.Trim(),
+            slugResult.Value!,
+            NormalizeOptionalText(request.Description),
+            NormalizeOptionalText(request.Category),
+            NormalizeOptionalText(request.GroupPlatform),
+            NormalizeOptionalText(request.GroupLink),
+            request.Status,
+            createdByUserId);
 
         await clubRepository.SaveChangesAsync(cancellationToken);
 
         return ServiceResult<ClubDto>.Success(ToDto(club));
-    }
-
-    public async Task<ServiceResult> DeleteClubAsync(Guid id, CancellationToken cancellationToken)
-    {
-        var club = await clubRepository.GetByIdAsync(id, trackChanges: true, cancellationToken);
-        if (club is null)
-        {
-            return ServiceResult.Failure(new ServiceError(
-                ServiceErrorType.NotFound,
-                "Club was not found."));
-        }
-
-        clubRepository.Remove(club);
-        await clubRepository.SaveChangesAsync(cancellationToken);
-
-        return ServiceResult.Success();
     }
 
     private async Task<ServiceResult<string>> ValidateSlugAsync(
@@ -155,6 +159,8 @@ public sealed class ClubService(IClubRepository clubRepository) : IClubService
         string? slug,
         string? description,
         string? category,
+        string? groupPlatform,
+        string? groupLink,
         ClubStatus status)
     {
         var errors = new Dictionary<string, string[]>();
@@ -181,6 +187,16 @@ public sealed class ClubService(IClubRepository clubRepository) : IClubService
         if (!string.IsNullOrWhiteSpace(category) && category.Trim().Length > 100)
         {
             errors[nameof(category)] = ["Category cannot exceed 100 characters."];
+        }
+
+        if (!string.IsNullOrWhiteSpace(groupPlatform) && groupPlatform.Trim().Length > 100)
+        {
+            errors[nameof(groupPlatform)] = ["Group platform cannot exceed 100 characters."];
+        }
+
+        if (!string.IsNullOrWhiteSpace(groupLink) && groupLink.Trim().Length > 500)
+        {
+            errors[nameof(groupLink)] = ["Group link cannot exceed 500 characters."];
         }
 
         if (!Enum.IsDefined(status))
@@ -215,6 +231,8 @@ public sealed class ClubService(IClubRepository clubRepository) : IClubService
             club.Slug,
             club.Description,
             club.Category,
+            club.GroupPlatform,
+            club.GroupLink,
             club.Status,
             club.CreatedByUserId,
             club.CreatedAt,
@@ -231,6 +249,13 @@ public sealed class ClubService(IClubRepository clubRepository) : IClubService
             {
                 [field] = [message]
             });
+    }
+
+    private static ServiceError ForbiddenError()
+    {
+        return new ServiceError(
+            ServiceErrorType.Forbidden,
+            "You do not have permission to perform this action.");
     }
 
     private static string NormalizeSlug(string? slug, string name)

@@ -11,9 +11,8 @@ public sealed class UserService(IUserRepository userRepository) : IUserService
         bool repairStaleClubLeaderRole,
         CancellationToken cancellationToken)
     {
-        var user = await userRepository.GetByEntraObjectIdAsync(
+        var user = await userRepository.GetByEntraObjectIdForUpdateAsync(
             request.EntraObjectId,
-            trackChanges: true,
             cancellationToken);
 
         if (user is null)
@@ -39,9 +38,8 @@ public sealed class UserService(IUserRepository userRepository) : IUserService
             }
             catch (PersistenceConflictException) when (isNewUser)
             {
-                user = await userRepository.GetByEntraObjectIdAsync(
+                user = await userRepository.GetByEntraObjectIdForUpdateAsync(
                     request.EntraObjectId,
-                    trackChanges: true,
                     cancellationToken)
                     ?? throw new PersistenceConflictException("The current user could not be loaded after creation conflict.");
 

@@ -22,4 +22,20 @@ public sealed class User : BaseEntity
     public ICollection<EventResponse> EventResponses { get; set; } = [];
     public ICollection<JoinRequest> JoinRequests { get; set; } = [];
     public ICollection<JoinRequest> ReviewedJoinRequests { get; set; } = [];
+
+    public void PromoteToClubLeader()
+    {
+        if (Role != AppRole.Admin)
+        {
+            Role = AppRole.ClubLeader;
+        }
+    }
+
+    public void DemoteToMember()
+    {
+        if (Role == AppRole.ClubLeader)
+        {
+            Role = AppRole.Member;
+        }
+    }
 }

@@ -1,6 +1,4 @@
 import { memo } from 'react';
-import { useMsal } from '@azure/msal-react';
-import { useAppDispatch } from '../../context/AppContext';
 
 const VIEW_LABELS = {
   home: { title: 'Home', sub: 'Your day at a glance: actions, deadlines, and updates.' },
@@ -11,13 +9,7 @@ const VIEW_LABELS = {
 export const Topbar = memo(function Topbar({
   activeView,
   currentUser,
-  clubs,
-  selectedClub,
-  selectedClubId,
-  onSelectClub,
 }) {
-  const dispatch = useAppDispatch();
-  const { instance } = useMsal();
   const { title, sub } = VIEW_LABELS[activeView] ?? VIEW_LABELS.home;
   const initials =
     currentUser?.avatar ??
@@ -28,8 +20,6 @@ export const Topbar = memo(function Topbar({
       .slice(0, 2) ??
     '?';
 
-  const canSwitchClub = clubs.length > 1 && currentUser?.role !== 'Member';
-
   return (
     <header className="topbar">
       <div>
@@ -39,43 +29,9 @@ export const Topbar = memo(function Topbar({
       </div>
 
       <div className="topbar-controls">
-        {canSwitchClub ? (
-          <label className="control-card">
-            Active club
-            <select value={selectedClubId} onChange={(e) => onSelectClub(e.target.value)}>
-              {clubs.map((club) => (
-                <option key={club.id} value={club.id}>
-                  {club.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : selectedClub ? (
-          <div className="control-card">
-            Active club
-            <strong>{selectedClub.name}</strong>
-          </div>
-        ) : null}
-
-        <div className="user-chip">
-          <div className="user-avatar">{initials}</div>
-          <div>
-            <strong>{currentUser?.name}</strong>
-            <span>{currentUser?.role}</span>
-          </div>
+        <div className="user-avatar topbar-avatar" title={currentUser?.name}>
+          {initials}
         </div>
-
-        <button
-          type="button"
-          className="logout-btn"
-          onClick={() => {
-            dispatch({ type: 'LOGOUT' });
-            instance.logoutRedirect();
-          }}
-          title="Sign out"
-        >
-          Sign out
-        </button>
       </div>
     </header>
   );

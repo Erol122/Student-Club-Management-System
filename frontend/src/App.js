@@ -57,10 +57,6 @@ const AuthenticatedShell = memo(function AuthenticatedShell({ currentUser }) {
         <Topbar
           activeView={activeView}
           currentUser={currentUser}
-          clubs={clubs}
-          selectedClubId={selectedClubId}
-          selectedClub={selectedClub}
-          onSelectClub={(clubId) => dispatch({ type: 'SELECT_CLUB', payload: clubId })}
         />
 
         <Suspense fallback={<div className="view-loading">Loading workspace...</div>}>

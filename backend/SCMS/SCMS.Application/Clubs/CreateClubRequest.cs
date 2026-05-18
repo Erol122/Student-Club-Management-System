@@ -7,4 +7,6 @@ public sealed record CreateClubRequest(
     string? Slug,
     string? Description,
     string? Category,
-    ClubStatus Status = ClubStatus.Draft);
+    ClubStatus Status = ClubStatus.Draft,
+    string? GroupPlatform = null,
+    string? GroupLink = null);

@@ -16,4 +16,40 @@ public sealed class JoinRequest : BaseEntity
     public Club Club { get; set; } = null!;
     public User User { get; set; } = null!;
     public User? ReviewedByUser { get; set; }
+
+    public static JoinRequest Submit(
+        Guid clubId,
+        Guid userId,
+        string? message,
+        DateTimeOffset submittedAt)
+    {
+        return new JoinRequest
+        {
+            ClubId = clubId,
+            UserId = userId,
+            Status = JoinRequestStatus.Pending,
+            Message = message,
+            SubmittedAt = submittedAt
+        };
+    }
+
+    public void Approve(Guid reviewedByUserId, DateTimeOffset reviewedAt)
+    {
+        Review(JoinRequestStatus.Approved, reviewedByUserId, reviewedAt);
+    }
+
+    public void Reject(Guid reviewedByUserId, DateTimeOffset reviewedAt)
+    {
+        Review(JoinRequestStatus.Rejected, reviewedByUserId, reviewedAt);
+    }
+
+    private void Review(
+        JoinRequestStatus status,
+        Guid reviewedByUserId,
+        DateTimeOffset reviewedAt)
+    {
+        Status = status;
+        ReviewedByUserId = reviewedByUserId;
+        ReviewedAt = reviewedAt;
+    }
 }

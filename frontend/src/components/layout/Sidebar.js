@@ -1,4 +1,6 @@
 import { memo } from 'react';
+import { useMsal } from '@azure/msal-react';
+import { useAppDispatch } from '../../context/AppContext';
 import iusLogo from '../../data/IUS_Official_Logo.png';
 
 function NavButton({ item, activeView, pendingCount, onNavigate, compact = false }) {
@@ -19,6 +21,9 @@ function NavButton({ item, activeView, pendingCount, onNavigate, compact = false
 }
 
 export const Sidebar = memo(function Sidebar({ activeView, items, pendingCount, currentUser, onNavigate }) {
+  const dispatch = useAppDispatch();
+  const { instance } = useMsal();
+
   return (
     <>
       <aside className="sidebar">
@@ -43,11 +48,25 @@ export const Sidebar = memo(function Sidebar({ activeView, items, pendingCount, 
           ))}
         </nav>
 
-        <div className="sidebar-footer">
-          <strong>{currentUser?.role}</strong>
-          <p>
-            Keep everything in one place: clubs, approvals, events, and group communication.
-          </p>
+        <div className="sidebar-account">
+          <div className="user-chip sidebar-user-chip">
+            <div>
+              <strong>{currentUser?.name}</strong>
+              <span>{currentUser?.role}</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="logout-btn sidebar-logout-btn"
+            onClick={() => {
+              dispatch({ type: 'LOGOUT' });
+              instance.logoutRedirect();
+            }}
+            title="Sign out"
+          >
+            Sign out
+          </button>
         </div>
       </aside>
 

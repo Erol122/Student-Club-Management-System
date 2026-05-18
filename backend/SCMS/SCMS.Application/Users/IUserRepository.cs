@@ -4,9 +4,8 @@ namespace SCMS.Application.Users;
 
 public interface IUserRepository
 {
-    Task<User?> GetByEntraObjectIdAsync(
+    Task<User?> GetByEntraObjectIdForUpdateAsync(
         string entraObjectId,
-        bool trackChanges,
         CancellationToken cancellationToken);
 
     Task<bool> UserOwnsAnyActiveClubAsync(Guid userId, CancellationToken cancellationToken);

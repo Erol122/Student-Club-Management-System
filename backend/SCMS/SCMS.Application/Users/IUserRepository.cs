@@ -9,6 +9,8 @@ public interface IUserRepository
         bool trackChanges,
         CancellationToken cancellationToken);
 
+    Task<bool> UserOwnsAnyActiveClubAsync(Guid userId, CancellationToken cancellationToken);
+
     Task AddAsync(User user, CancellationToken cancellationToken);
 
     Task SaveChangesAsync(CancellationToken cancellationToken);

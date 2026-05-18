@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using SCMS.Application.ClubWorkflows;
 using SCMS.Application.Clubs;
 using SCMS.Application.Common;
 
@@ -6,7 +7,9 @@ namespace SCM.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public sealed class ClubsController(IClubService clubService) : ControllerBase
+public sealed class ClubsController(
+    IClubService clubService,
+    IClubWorkflowService clubWorkflowService) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<ClubDto>>> GetClubs(
@@ -30,6 +33,16 @@ public sealed class ClubsController(IClubService clubService) : ControllerBase
         CreateClubRequest request,
         CancellationToken cancellationToken)
     {
+        if (!this.TryGetCurrentUser(out var currentUser))
+        {
+            return Unauthorized();
+        }
+
+        if (!string.Equals(currentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+        {
+            return Forbid();
+        }
+
         var result = await clubService.CreateClubAsync(request, cancellationToken);
         if (!result.Succeeded)
         {
@@ -45,6 +58,16 @@ public sealed class ClubsController(IClubService clubService) : ControllerBase
         UpdateClubRequest request,
         CancellationToken cancellationToken)
     {
+        if (!this.TryGetCurrentUser(out var currentUser))
+        {
+            return Unauthorized();
+        }
+
+        if (!string.Equals(currentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+        {
+            return Forbid();
+        }
+
         var result = await clubService.UpdateClubAsync(id, request, cancellationToken);
         if (!result.Succeeded)
         {
@@ -57,7 +80,12 @@ public sealed class ClubsController(IClubService clubService) : ControllerBase
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> DeleteClub(Guid id, CancellationToken cancellationToken)
     {
-        var result = await clubService.DeleteClubAsync(id, cancellationToken);
+        if (!this.TryGetCurrentUser(out var currentUser))
+        {
+            return Unauthorized();
+        }
+
+        var result = await clubWorkflowService.DeleteClubAsync(currentUser, id, cancellationToken);
         if (!result.Succeeded)
         {
             return ToActionResult(result.Error!);
@@ -85,6 +113,7 @@ public sealed class ClubsController(IClubService clubService) : ControllerBase
                 Status = StatusCodes.Status409Conflict,
                 Instance = HttpContext.Request.Path
             }),
+            ServiceErrorType.Forbidden => Forbid(),
             _ => Problem(error.Message)
         };
     }

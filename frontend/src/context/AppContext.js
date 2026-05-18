@@ -1,12 +1,24 @@
 import { createContext, useContext, useEffect, useReducer } from 'react';
+import { useMsal } from '@azure/msal-react';
 import {
   initialAnnouncements,
-  initialClubRequests,
   initialClubs,
   initialEvents,
-  initialMembershipRequests,
 } from '../data/mockData';
-import { createClub, deleteClub, fetchClubs, updateClub } from '../services/clubApi';
+import {
+  approveClubProposal,
+  approveJoinRequest,
+  createClub,
+  deleteClub,
+  fetchClubProposals,
+  fetchClubs,
+  fetchJoinRequests,
+  rejectClubProposal,
+  rejectJoinRequest,
+  submitClubProposal,
+  submitJoinRequest,
+  updateClub,
+} from '../services/clubApi';
 
 const fmtDate = (ts) =>
   new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short', year: 'numeric' }).format(
@@ -32,6 +44,16 @@ const DEFAULT_ACCENT = '#5b8def';
 const DEFAULT_GROUP_PLATFORM = 'WhatsApp';
 const DEFAULT_NEXT_EVENT = 'No event scheduled';
 const DEFAULT_LEADER = 'Club admin';
+const ROLE_LABELS = {
+  1: 'Member',
+  2: 'Officer',
+  3: 'Vice Leader',
+  4: 'Club Leader',
+  Member: 'Member',
+  Officer: 'Officer',
+  VicePresident: 'Vice Leader',
+  President: 'Club Leader',
+};
 
 function logEntry(message, type = 'info') {
   return {
@@ -78,24 +100,65 @@ function getClubFallback(dto, existingClub) {
 
 function mapApiClubToUi(dto, existingClub = null) {
   const fallback = getClubFallback(dto, existingClub);
+  const members = (dto.members ?? fallback?.members ?? []).map((member) => ({
+    id: member.id,
+    userId: member.userId,
+    name: member.name,
+    email: member.email,
+    role: ROLE_LABELS[member.role] ?? member.role ?? 'Member',
+    program: member.program ?? 'Student',
+  }));
+  const owner = members.find((member) => member.role === 'Club Leader');
 
   return {
     id: dto.id,
     name: dto.name,
     category: dto.category ?? fallback?.category ?? 'General',
     summary: dto.description ?? fallback?.summary ?? 'No description yet.',
-    leader: fallback?.leader ?? DEFAULT_LEADER,
+    leader: owner?.name ?? fallback?.leader ?? DEFAULT_LEADER,
     accent: fallback?.accent ?? DEFAULT_ACCENT,
     health: normalizeClubStatus(dto.status),
     nextEvent: fallback?.nextEvent ?? DEFAULT_NEXT_EVENT,
     groupPlatform: fallback?.groupPlatform ?? DEFAULT_GROUP_PLATFORM,
     groupLink: fallback?.groupLink ?? '',
     announcementsCount: fallback?.announcementsCount ?? 0,
-    members: fallback?.members ?? [],
+    members,
     slug: dto.slug,
     status: dto.status,
     createdAt: dto.createdAt,
     updatedAt: dto.updatedAt,
+  };
+}
+
+function mapProposalToUi(dto) {
+  return {
+    id: dto.id,
+    name: dto.name,
+    category: dto.category ?? 'General',
+    proposedBy: dto.proposedBy,
+    proposedByEmail: dto.proposedByEmail,
+    mission: dto.mission,
+    status: dto.status,
+  };
+}
+
+function mapJoinRequestToUi(dto) {
+  return {
+    id: dto.id,
+    clubId: dto.clubId,
+    student: dto.student,
+    email: dto.email,
+    program: dto.program ?? 'Student',
+    reason: dto.reason ?? 'Interested in joining this club.',
+    status: dto.status,
+  };
+}
+
+function mapUiProposalToRequest(draft) {
+  return {
+    name: draft.name.trim(),
+    category: draft.category.trim(),
+    mission: draft.mission.trim(),
   };
 }
 
@@ -140,6 +203,18 @@ function syncSelectedClubId(selectedClubId, clubs) {
   return clubs.some((club) => club.id === selectedClubId) ? selectedClubId : clubs[0].id;
 }
 
+function ownsAnyClub(user, clubs) {
+  if (!user) return false;
+
+  return clubs.some((club) =>
+    club.members.some(
+      (member) =>
+        member.role === 'Club Leader' &&
+        (member.email === user.email || member.name === user.name)
+    )
+  );
+}
+
 const NOW = Date.now();
 
 const initialState = {
@@ -152,8 +227,8 @@ const initialState = {
   clubsLoading: false,
   clubsSaving: false,
   clubsError: null,
-  clubRequests: initialClubRequests,
-  membershipRequests: initialMembershipRequests,
+  clubRequests: [],
+  membershipRequests: [],
   announcements: initialAnnouncements,
   events: initialEvents,
   activityLog: [
@@ -217,9 +292,16 @@ function reducer(state, action) {
       const clubs = action.payload.map((clubDto) =>
         mapApiClubToUi(clubDto, previousClubsById.get(clubDto.id) ?? null)
       );
+      const shouldDowngradeLeader =
+        state.currentUser?.role === 'Club Leader' && !ownsAnyClub(state.currentUser, clubs);
+      const currentUser = shouldDowngradeLeader
+        ? { ...state.currentUser, role: 'Member' }
+        : state.currentUser;
 
       return {
         ...state,
+        currentUser,
+        activeRole: shouldDowngradeLeader ? 'Member' : state.activeRole,
         clubs,
         clubsLoading: false,
         clubsError: null,
@@ -233,6 +315,13 @@ function reducer(state, action) {
         clubsLoading: false,
         clubsError: action.payload,
         toast: { message: action.payload, type: 'info' },
+      };
+
+    case 'LOAD_WORKFLOW_SUCCESS':
+      return {
+        ...state,
+        clubRequests: action.payload.clubRequests.map(mapProposalToUi),
+        membershipRequests: action.payload.membershipRequests.map(mapJoinRequestToUi),
       };
 
     case 'SAVE_CLUB_START':
@@ -300,9 +389,10 @@ function reducer(state, action) {
       };
 
     case 'SUBMIT_CLUB_REQUEST': {
-      const req = { id: `cr-${Date.now()}`, ...action.payload };
+      const req = mapProposalToUi(action.payload);
       return {
         ...state,
+        clubsSaving: false,
         clubRequests: [req, ...state.clubRequests],
         activityLog: [logEntry(`Club proposal submitted: "${req.name}"`, 'club'), ...state.activityLog],
         toast: { message: `"${req.name}" sent to admin for review`, type: 'success' },
@@ -311,12 +401,13 @@ function reducer(state, action) {
 
     case 'APPROVE_CLUB': {
       const req = state.clubRequests.find((r) => r.id === action.payload);
-      if (!req) return state;
+      if (!req) return { ...state, clubsSaving: false };
       return {
         ...state,
+        clubsSaving: false,
         clubRequests: state.clubRequests.filter((r) => r.id !== action.payload),
         activityLog: [logEntry(`Club approved: "${req.name}"`, 'club'), ...state.activityLog],
-        toast: { message: `${req.name} approved locally`, type: 'success' },
+        toast: { message: `${req.name} approved`, type: 'success' },
       };
     }
 
@@ -324,6 +415,7 @@ function reducer(state, action) {
       const req = state.clubRequests.find((r) => r.id === action.payload);
       return {
         ...state,
+        clubsSaving: false,
         clubRequests: state.clubRequests.filter((r) => r.id !== action.payload),
         activityLog: [logEntry(`Club proposal rejected: "${req?.name}"`, 'info'), ...state.activityLog],
         toast: { message: 'Club proposal rejected', type: 'info' },
@@ -332,21 +424,17 @@ function reducer(state, action) {
 
     case 'REQUEST_MEMBERSHIP': {
       const userName = state.currentUser?.name;
+      const userEmail = state.currentUser?.email;
       const club = state.clubs.find((c) => c.id === action.payload);
       const alreadyPending = state.membershipRequests.some(
-        (r) => r.clubId === action.payload && r.student === userName
+        (r) => r.clubId === action.payload && (r.email === userEmail || r.student === userName)
       );
-      const isMember = club?.members.some((m) => m.name === userName);
-      if (alreadyPending || isMember) return state;
-      const req = {
-        id: `mr-${Date.now()}`,
-        clubId: action.payload,
-        student: userName,
-        program: state.currentUser?.program ?? 'Student',
-        reason: 'Interested in contributing to workshops and weekly activities.',
-      };
+      const isMember = club?.members.some((m) => m.email === userEmail || m.name === userName);
+      if (alreadyPending || isMember) return { ...state, clubsSaving: false };
+      const req = mapJoinRequestToUi(action.meta);
       return {
         ...state,
+        clubsSaving: false,
         membershipRequests: [req, ...state.membershipRequests],
         toast: { message: `Request sent to ${club?.name}`, type: 'success' },
       };
@@ -354,10 +442,11 @@ function reducer(state, action) {
 
     case 'APPROVE_MEMBERSHIP': {
       const req = state.membershipRequests.find((r) => r.id === action.payload);
-      if (!req) return state;
+      if (!req) return { ...state, clubsSaving: false };
       const club = state.clubs.find((c) => c.id === req.clubId);
       return {
         ...state,
+        clubsSaving: false,
         clubs: state.clubs.map((c) =>
           c.id === req.clubId
             ? {
@@ -382,6 +471,7 @@ function reducer(state, action) {
       const req = state.membershipRequests.find((r) => r.id === action.payload);
       return {
         ...state,
+        clubsSaving: false,
         membershipRequests: state.membershipRequests.filter((r) => r.id !== action.payload),
         toast: { message: `${req?.student}'s request declined`, type: 'info' },
       };
@@ -475,34 +565,6 @@ export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
   useEffect(() => {
-    let ignore = false;
-
-    async function load() {
-      dispatch({ type: 'LOAD_CLUBS_START' });
-
-      try {
-        const clubs = await fetchClubs();
-        if (!ignore) {
-          dispatch({ type: 'LOAD_CLUBS_SUCCESS', payload: clubs });
-        }
-      } catch (error) {
-        if (!ignore) {
-          dispatch({
-            type: 'LOAD_CLUBS_FAILURE',
-            payload: `Could not load clubs from the backend. ${error.message}`,
-          });
-        }
-      }
-    }
-
-    load();
-
-    return () => {
-      ignore = true;
-    };
-  }, []);
-
-  useEffect(() => {
     if (!state.toast) return;
     const id = setTimeout(() => dispatch({ type: 'DISMISS_TOAST' }), 3200);
     return () => clearTimeout(id);
@@ -526,13 +588,43 @@ export function useAppDispatch() {
 export function useClubActions() {
   const dispatch = useAppDispatch();
   const { clubs } = useAppState();
+  const { instance, accounts } = useMsal();
+
+  const getAuth = () => {
+    const account = instance.getActiveAccount() ?? accounts[0];
+    if (!account) {
+      throw new Error('You need to sign in before using club actions.');
+    }
+
+    return { instance, account };
+  };
 
   return {
+    async reloadWorkspace() {
+      dispatch({ type: 'LOAD_CLUBS_START' });
+
+      try {
+        const auth = getAuth();
+        const [clubList, clubRequests, membershipRequests] = await Promise.all([
+          fetchClubs(auth),
+          fetchClubProposals(auth),
+          fetchJoinRequests(auth),
+        ]);
+        dispatch({ type: 'LOAD_CLUBS_SUCCESS', payload: clubList });
+        dispatch({ type: 'LOAD_WORKFLOW_SUCCESS', payload: { clubRequests, membershipRequests } });
+      } catch (error) {
+        dispatch({
+          type: 'LOAD_CLUBS_FAILURE',
+          payload: `Could not load clubs from the backend. ${error.message}`,
+        });
+      }
+    },
+
     async reloadClubs() {
       dispatch({ type: 'LOAD_CLUBS_START' });
 
       try {
-        const clubList = await fetchClubs();
+        const clubList = await fetchClubs(getAuth());
         dispatch({ type: 'LOAD_CLUBS_SUCCESS', payload: clubList });
       } catch (error) {
         dispatch({
@@ -546,7 +638,7 @@ export function useClubActions() {
       dispatch({ type: 'SAVE_CLUB_START' });
 
       try {
-        const savedClub = await createClub(mapUiClubToCreateRequest(draft));
+        const savedClub = await createClub(getAuth(), mapUiClubToCreateRequest(draft));
         dispatch({ type: 'CREATE_CLUB_SUCCESS', payload: savedClub });
         return true;
       } catch (error) {
@@ -563,7 +655,7 @@ export function useClubActions() {
 
       try {
         const currentClub = clubs.find((club) => club.id === id) ?? null;
-        const savedClub = await updateClub(id, mapUiClubToUpdateRequest(draft, currentClub));
+        const savedClub = await updateClub(getAuth(), id, mapUiClubToUpdateRequest(draft, currentClub));
         dispatch({ type: 'UPDATE_CLUB_SUCCESS', payload: savedClub });
         return true;
       } catch (error) {
@@ -579,8 +671,112 @@ export function useClubActions() {
       dispatch({ type: 'SAVE_CLUB_START' });
 
       try {
-        await deleteClub(id);
+        await deleteClub(getAuth(), id);
         dispatch({ type: 'DELETE_CLUB_SUCCESS', payload: id });
+        return true;
+      } catch (error) {
+        dispatch({
+          type: 'SAVE_CLUB_FAILURE',
+          payload: buildFieldError(error.body) || error.message,
+        });
+        return false;
+      }
+    },
+
+    async submitClubProposalRecord(draft) {
+      dispatch({ type: 'SAVE_CLUB_START' });
+
+      try {
+        const proposal = await submitClubProposal(getAuth(), mapUiProposalToRequest(draft));
+        dispatch({ type: 'SUBMIT_CLUB_REQUEST', payload: proposal });
+        return true;
+      } catch (error) {
+        dispatch({
+          type: 'SAVE_CLUB_FAILURE',
+          payload: buildFieldError(error.body) || error.message,
+        });
+        return false;
+      }
+    },
+
+    async approveClubProposalRecord(id) {
+      dispatch({ type: 'SAVE_CLUB_START' });
+
+      try {
+        await approveClubProposal(getAuth(), id);
+        dispatch({ type: 'APPROVE_CLUB', payload: id });
+        const clubList = await fetchClubs(getAuth());
+        dispatch({ type: 'LOAD_CLUBS_SUCCESS', payload: clubList });
+        return true;
+      } catch (error) {
+        dispatch({
+          type: 'SAVE_CLUB_FAILURE',
+          payload: buildFieldError(error.body) || error.message,
+        });
+        return false;
+      }
+    },
+
+    async rejectClubProposalRecord(id) {
+      dispatch({ type: 'SAVE_CLUB_START' });
+
+      try {
+        await rejectClubProposal(getAuth(), id);
+        dispatch({ type: 'REJECT_CLUB', payload: id });
+        return true;
+      } catch (error) {
+        dispatch({
+          type: 'SAVE_CLUB_FAILURE',
+          payload: buildFieldError(error.body) || error.message,
+        });
+        return false;
+      }
+    },
+
+    async requestMembershipRecord(clubId) {
+      dispatch({ type: 'SAVE_CLUB_START' });
+
+      try {
+        const request = await submitJoinRequest(
+          getAuth(),
+          clubId,
+          'Interested in contributing to workshops and weekly activities.'
+        );
+        dispatch({ type: 'REQUEST_MEMBERSHIP', payload: clubId, meta: request });
+        return true;
+      } catch (error) {
+        dispatch({
+          type: 'SAVE_CLUB_FAILURE',
+          payload: buildFieldError(error.body) || error.message,
+        });
+        return false;
+      }
+    },
+
+    async approveMembershipRecord(id) {
+      dispatch({ type: 'SAVE_CLUB_START' });
+
+      try {
+        await approveJoinRequest(getAuth(), id);
+        dispatch({ type: 'APPROVE_MEMBERSHIP', payload: id });
+        const clubList = await fetchClubs(getAuth());
+        dispatch({ type: 'LOAD_CLUBS_SUCCESS', payload: clubList });
+        return true;
+      } catch (error) {
+        dispatch({
+          type: 'SAVE_CLUB_FAILURE',
+          payload: buildFieldError(error.body) || error.message,
+        });
+        return false;
+      }
+    },
+
+    async rejectMembershipRecord(id) {
+      dispatch({ type: 'SAVE_CLUB_START' });
+
+      try {
+        await rejectJoinRequest(getAuth(), id);
+        dispatch({ type: 'DECLINE_MEMBERSHIP', payload: id });
         return true;
       } catch (error) {
         dispatch({

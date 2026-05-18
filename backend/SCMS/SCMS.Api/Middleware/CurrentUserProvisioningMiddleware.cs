@@ -42,6 +42,7 @@ public sealed class CurrentUserProvisioningMiddleware(RequestDelegate next)
 
         var currentUser = await userService.GetOrCreateCurrentUserAsync(
             new CurrentUserRequest(entraObjectId, email, displayName, firstName, lastName),
+            context.Request.Path.Equals("/api/me", StringComparison.OrdinalIgnoreCase),
             context.RequestAborted);
 
         context.Items["CurrentUser"] = currentUser;

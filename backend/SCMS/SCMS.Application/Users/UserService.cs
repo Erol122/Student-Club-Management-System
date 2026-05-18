@@ -8,6 +8,7 @@ public sealed class UserService(IUserRepository userRepository) : IUserService
 {
     public async Task<CurrentUserDto> GetOrCreateCurrentUserAsync(
         CurrentUserRequest request,
+        bool repairStaleClubLeaderRole,
         CancellationToken cancellationToken)
     {
         var user = await userRepository.GetByEntraObjectIdAsync(
@@ -44,27 +45,65 @@ public sealed class UserService(IUserRepository userRepository) : IUserService
                     cancellationToken)
                     ?? throw new PersistenceConflictException("The current user could not be loaded after creation conflict.");
 
-                ApplyProfile(user, request);
-                await userRepository.SaveChangesAsync(cancellationToken);
+                if (ApplyProfile(user, request))
+                {
+                    await userRepository.SaveChangesAsync(cancellationToken);
+                }
             }
         }
         else
         {
-            ApplyProfile(user, request);
-            await userRepository.SaveChangesAsync(cancellationToken);
+            if (ApplyProfile(user, request))
+            {
+                await userRepository.SaveChangesAsync(cancellationToken);
+            }
         }
 
+        if (repairStaleClubLeaderRole &&
+            user.Role == AppRole.ClubLeader &&
+            !await userRepository.UserOwnsAnyActiveClubAsync(user.Id, cancellationToken))
+        {
+            user.Role = AppRole.Member;
+            await userRepository.SaveChangesAsync(cancellationToken);
+        }
 
         return ToDto(user);
     }
 
-    private static void ApplyProfile(User user, CurrentUserRequest request)
+    private static bool ApplyProfile(User user, CurrentUserRequest request)
     {
-        user.Email = NormalizeRequired(request.Email);
-        user.DisplayName = NormalizeRequired(request.DisplayName);
-        user.FirstName = NormalizeOptional(request.FirstName);
-        user.LastName = NormalizeOptional(request.LastName);
-        user.LastLoginAt = DateTimeOffset.UtcNow;
+        var email = NormalizeRequired(request.Email);
+        var displayName = NormalizeRequired(request.DisplayName);
+        var firstName = NormalizeOptional(request.FirstName);
+        var lastName = NormalizeOptional(request.LastName);
+
+        var changed = false;
+
+        if (user.Email != email)
+        {
+            user.Email = email;
+            changed = true;
+        }
+
+        if (user.DisplayName != displayName)
+        {
+            user.DisplayName = displayName;
+            changed = true;
+        }
+
+        if (user.FirstName != firstName)
+        {
+            user.FirstName = firstName;
+            changed = true;
+        }
+
+        if (user.LastName != lastName)
+        {
+            user.LastName = lastName;
+            changed = true;
+        }
+
+        return changed;
     }
 
     private static CurrentUserDto ToDto(User user)

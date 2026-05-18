@@ -11,4 +11,5 @@ public sealed record ClubDto(
     ClubStatus Status,
     Guid? CreatedByUserId,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    IReadOnlyList<ClubMemberDto> Members);

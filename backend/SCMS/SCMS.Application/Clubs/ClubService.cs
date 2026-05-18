@@ -195,6 +195,20 @@ public sealed class ClubService(IClubRepository clubRepository) : IClubService
 
     private static ClubDto ToDto(Club club)
     {
+        var members = club.Memberships
+            .Where(membership => membership.Status == ClubMembershipStatus.Approved)
+            .OrderBy(membership => membership.Role)
+            .ThenBy(membership => membership.User.DisplayName)
+            .Select(membership => new ClubMemberDto(
+                membership.Id,
+                membership.UserId,
+                membership.User.DisplayName,
+                membership.User.Email,
+                membership.Role,
+                membership.Status,
+                membership.JoinedAt))
+            .ToList();
+
         return new ClubDto(
             club.Id,
             club.Name,
@@ -204,7 +218,8 @@ public sealed class ClubService(IClubRepository clubRepository) : IClubService
             club.Status,
             club.CreatedByUserId,
             club.CreatedAt,
-            club.UpdatedAt);
+            club.UpdatedAt,
+            members);
     }
 
     private static ServiceError ValidationError(string field, string message)

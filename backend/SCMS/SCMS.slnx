@@ -6,4 +6,5 @@
   <Project Path="SCMS.Infrastructure/SCMS.Infrastructure.csproj" Id="9d0f1c4a-d34c-469c-993a-cb1e4d7f44bb" />
   <Project Path="SCMS.MigrationService/SCMS.MigrationService.csproj" />
   <Project Path="SCMS.ServiceDefaults/SCMS.ServiceDefaults.csproj" />
+  <Project Path="SCMS.Tests/SCMS.Tests.csproj" />
 </Solution>

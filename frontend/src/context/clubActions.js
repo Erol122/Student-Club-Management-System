@@ -1,0 +1,278 @@
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useMsal } from '@azure/msal-react';
+import {
+  approveClubProposal,
+  approveJoinRequest,
+  createAnnouncement,
+  createClub,
+  createEvent,
+  deleteClub,
+  fetchAnnouncements,
+  fetchClubProposals,
+  fetchClubs,
+  fetchEvents,
+  fetchJoinRequests,
+  rejectClubProposal,
+  rejectJoinRequest,
+  submitClubProposal,
+  submitJoinRequest,
+  updateClub,
+} from '../services/clubApi';
+import {
+  buildFieldError,
+  mapUiAnnouncementToRequest,
+  mapUiClubToCreateRequest,
+  mapUiClubToUpdateRequest,
+  mapUiEventToRequest,
+  mapUiProposalToRequest,
+} from './appMappers';
+import { useAppDispatch, useAppState } from './AppContext';
+
+export function useClubActions() {
+  const dispatch = useAppDispatch();
+  const { clubs } = useAppState();
+  const { instance, accounts } = useMsal();
+  const clubsRef = useRef(clubs);
+
+  useEffect(() => {
+    clubsRef.current = clubs;
+  }, [clubs]);
+
+  const getAuth = useCallback(() => {
+    const account = instance.getActiveAccount() ?? accounts[0];
+    if (!account) {
+      throw new Error('You need to sign in before using club actions.');
+    }
+
+    return { instance, account };
+  }, [accounts, instance]);
+
+  return useMemo(() => ({
+    async reloadWorkspace() {
+      dispatch({ type: 'LOAD_CLUBS_START' });
+
+      try {
+        const auth = getAuth();
+        const [clubList, clubRequests, membershipRequests, announcements, events] =
+          await Promise.all([
+            fetchClubs(auth),
+            fetchClubProposals(auth),
+            fetchJoinRequests(auth),
+            fetchAnnouncements(auth),
+            fetchEvents(auth),
+          ]);
+        dispatch({ type: 'LOAD_CLUBS_SUCCESS', payload: clubList });
+        dispatch({ type: 'LOAD_WORKFLOW_SUCCESS', payload: { clubRequests, membershipRequests } });
+        dispatch({ type: 'LOAD_CONTENT_SUCCESS', payload: { announcements, events } });
+      } catch (error) {
+        dispatch({
+          type: 'LOAD_CLUBS_FAILURE',
+          payload: `Could not load clubs from the backend. ${error.message}`,
+        });
+      }
+    },
+
+    async reloadClubs() {
+      dispatch({ type: 'LOAD_CLUBS_START' });
+
+      try {
+        const clubList = await fetchClubs(getAuth());
+        dispatch({ type: 'LOAD_CLUBS_SUCCESS', payload: clubList });
+      } catch (error) {
+        dispatch({
+          type: 'LOAD_CLUBS_FAILURE',
+          payload: `Could not load clubs from the backend. ${error.message}`,
+        });
+      }
+    },
+
+    async createClubRecord(draft) {
+      dispatch({ type: 'SAVE_CLUB_START' });
+
+      try {
+        const savedClub = await createClub(getAuth(), mapUiClubToCreateRequest(draft));
+        dispatch({ type: 'CREATE_CLUB_SUCCESS', payload: savedClub });
+        return true;
+      } catch (error) {
+        dispatch({
+          type: 'SAVE_CLUB_FAILURE',
+          payload: buildFieldError(error.body) || error.message,
+        });
+        return false;
+      }
+    },
+
+    async updateClubRecord(id, draft) {
+      dispatch({ type: 'SAVE_CLUB_START' });
+
+      try {
+        const currentClub = clubsRef.current.find((club) => club.id === id) ?? null;
+        const savedClub = await updateClub(getAuth(), id, mapUiClubToUpdateRequest(draft, currentClub));
+        dispatch({ type: 'UPDATE_CLUB_SUCCESS', payload: savedClub });
+        return true;
+      } catch (error) {
+        dispatch({
+          type: 'SAVE_CLUB_FAILURE',
+          payload: buildFieldError(error.body) || error.message,
+        });
+        return false;
+      }
+    },
+
+    async deleteClubRecord(id) {
+      dispatch({ type: 'SAVE_CLUB_START' });
+
+      try {
+        await deleteClub(getAuth(), id);
+        dispatch({ type: 'DELETE_CLUB_SUCCESS', payload: id });
+        return true;
+      } catch (error) {
+        dispatch({
+          type: 'SAVE_CLUB_FAILURE',
+          payload: buildFieldError(error.body) || error.message,
+        });
+        return false;
+      }
+    },
+
+    async submitClubProposalRecord(draft) {
+      dispatch({ type: 'SAVE_CLUB_START' });
+
+      try {
+        const proposal = await submitClubProposal(getAuth(), mapUiProposalToRequest(draft));
+        dispatch({ type: 'SUBMIT_CLUB_REQUEST', payload: proposal });
+        return true;
+      } catch (error) {
+        dispatch({
+          type: 'SAVE_CLUB_FAILURE',
+          payload: buildFieldError(error.body) || error.message,
+        });
+        return false;
+      }
+    },
+
+    async approveClubProposalRecord(id) {
+      dispatch({ type: 'SAVE_CLUB_START' });
+
+      try {
+        await approveClubProposal(getAuth(), id);
+        dispatch({ type: 'APPROVE_CLUB', payload: id });
+        const clubList = await fetchClubs(getAuth());
+        dispatch({ type: 'LOAD_CLUBS_SUCCESS', payload: clubList });
+        return true;
+      } catch (error) {
+        dispatch({
+          type: 'SAVE_CLUB_FAILURE',
+          payload: buildFieldError(error.body) || error.message,
+        });
+        return false;
+      }
+    },
+
+    async rejectClubProposalRecord(id) {
+      dispatch({ type: 'SAVE_CLUB_START' });
+
+      try {
+        await rejectClubProposal(getAuth(), id);
+        dispatch({ type: 'REJECT_CLUB', payload: id });
+        return true;
+      } catch (error) {
+        dispatch({
+          type: 'SAVE_CLUB_FAILURE',
+          payload: buildFieldError(error.body) || error.message,
+        });
+        return false;
+      }
+    },
+
+    async requestMembershipRecord(clubId) {
+      dispatch({ type: 'SAVE_CLUB_START' });
+
+      try {
+        const request = await submitJoinRequest(
+          getAuth(),
+          clubId,
+          'Interested in contributing to workshops and weekly activities.'
+        );
+        dispatch({ type: 'REQUEST_MEMBERSHIP', payload: clubId, meta: request });
+        return true;
+      } catch (error) {
+        dispatch({
+          type: 'SAVE_CLUB_FAILURE',
+          payload: buildFieldError(error.body) || error.message,
+        });
+        return false;
+      }
+    },
+
+    async publishAnnouncementRecord(clubId, draft) {
+      dispatch({ type: 'SAVE_CLUB_START' });
+
+      try {
+        const announcement = await createAnnouncement(
+          getAuth(),
+          clubId,
+          mapUiAnnouncementToRequest(draft)
+        );
+        dispatch({ type: 'PUBLISH_ANNOUNCEMENT_SUCCESS', payload: announcement });
+        return true;
+      } catch (error) {
+        dispatch({
+          type: 'SAVE_CLUB_FAILURE',
+          payload: buildFieldError(error.body) || error.message,
+        });
+        return false;
+      }
+    },
+
+    async scheduleEventRecord(clubId, draft) {
+      dispatch({ type: 'SAVE_CLUB_START' });
+
+      try {
+        const event = await createEvent(getAuth(), clubId, mapUiEventToRequest(draft));
+        dispatch({ type: 'SCHEDULE_EVENT_SUCCESS', payload: event });
+        return true;
+      } catch (error) {
+        dispatch({
+          type: 'SAVE_CLUB_FAILURE',
+          payload: buildFieldError(error.body) || error.message,
+        });
+        return false;
+      }
+    },
+
+    async approveMembershipRecord(id) {
+      dispatch({ type: 'SAVE_CLUB_START' });
+
+      try {
+        await approveJoinRequest(getAuth(), id);
+        dispatch({ type: 'APPROVE_MEMBERSHIP', payload: id });
+        const clubList = await fetchClubs(getAuth());
+        dispatch({ type: 'LOAD_CLUBS_SUCCESS', payload: clubList });
+        return true;
+      } catch (error) {
+        dispatch({
+          type: 'SAVE_CLUB_FAILURE',
+          payload: buildFieldError(error.body) || error.message,
+        });
+        return false;
+      }
+    },
+
+    async rejectMembershipRecord(id) {
+      dispatch({ type: 'SAVE_CLUB_START' });
+
+      try {
+        await rejectJoinRequest(getAuth(), id);
+        dispatch({ type: 'DECLINE_MEMBERSHIP', payload: id });
+        return true;
+      } catch (error) {
+        dispatch({
+          type: 'SAVE_CLUB_FAILURE',
+          payload: buildFieldError(error.body) || error.message,
+        });
+        return false;
+      }
+    },
+  }), [dispatch, getAuth]);
+}

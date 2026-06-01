@@ -11,7 +11,10 @@ public sealed class ClubContentService(IClubContentRepository repository) : IClu
         CurrentUserDto currentUser,
         CancellationToken cancellationToken)
     {
-        var announcements = await repository.ListAnnouncementsAsync(cancellationToken);
+        var announcements = await repository.ListAnnouncementsAsync(
+            currentUser.Id,
+            currentUser.IsAdmin,
+            cancellationToken);
         return ServiceResult<IReadOnlyList<ClubAnnouncementDto>>.Success(
             announcements.Select(ToAnnouncementDto).ToList());
     }
@@ -20,7 +23,10 @@ public sealed class ClubContentService(IClubContentRepository repository) : IClu
         CurrentUserDto currentUser,
         CancellationToken cancellationToken)
     {
-        var events = await repository.ListEventsAsync(cancellationToken);
+        var events = await repository.ListEventsAsync(
+            currentUser.Id,
+            currentUser.IsAdmin,
+            cancellationToken);
         return ServiceResult<IReadOnlyList<ClubEventDto>>.Success(
             events.Select(ToEventDto).ToList());
     }

@@ -1,5 +1,7 @@
 import { memo, useMemo, useState } from 'react';
-import { useAppState, useClubActions } from '../../context/AppContext';
+import { useAppState } from '../../context/AppContext';
+import { useClubActions } from '../../context/clubActions';
+import { APP_ROLES } from '../../domain/roles';
 import { SectionCard } from '../common/SectionCard';
 
 const emptyAnnouncement = { title: '', body: '' };
@@ -493,7 +495,7 @@ function MemberManage({ clubs, membershipRequests, currentUser }) {
 }
 
 export const OperationsView = memo(function OperationsView(props) {
-  if (props.activeRole === 'Admin') return <AdminManage {...props} />;
-  if (props.activeRole === 'Club Leader') return <LeaderManage {...props} />;
+  if (props.activeRole === APP_ROLES.Admin) return <AdminManage {...props} />;
+  if (props.activeRole === APP_ROLES.ClubLeader) return <LeaderManage {...props} />;
   return <MemberManage {...props} />;
 });

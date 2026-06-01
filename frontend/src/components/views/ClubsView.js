@@ -1,5 +1,7 @@
 import { memo, useCallback, useMemo, useState } from 'react';
-import { useAppDispatch, useClubActions } from '../../context/AppContext';
+import { useAppDispatch } from '../../context/AppContext';
+import { useClubActions } from '../../context/clubActions';
+import { APP_ROLES } from '../../domain/roles';
 import { SectionCard } from '../common/SectionCard';
 
 const TABS = [
@@ -277,7 +279,7 @@ export const ClubsView = memo(function ClubsView({
     [clubs, filterClubs, memberClubIds]
   );
 
-  if (activeRole === 'Member') {
+  if (activeRole === APP_ROLES.Member) {
     const showMyClubs = memberView === 'my-clubs';
 
     return (

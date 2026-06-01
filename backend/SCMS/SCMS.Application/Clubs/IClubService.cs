@@ -6,11 +6,15 @@ namespace SCMS.Application.Clubs;
 public interface IClubService
 {
     Task<IReadOnlyList<ClubDto>> GetClubsAsync(
+        CurrentUserDto currentUser,
         string? search,
         string? category,
         CancellationToken cancellationToken);
 
-    Task<ClubDto?> GetClubAsync(Guid id, CancellationToken cancellationToken);
+    Task<ClubDto?> GetClubAsync(
+        CurrentUserDto currentUser,
+        Guid id,
+        CancellationToken cancellationToken);
 
     Task<ServiceResult<ClubDto>> CreateClubAsync(
         CurrentUserDto currentUser,

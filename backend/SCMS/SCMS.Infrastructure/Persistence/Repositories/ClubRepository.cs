@@ -10,6 +10,8 @@ namespace SCMS.Infrastructure.Persistence.Repositories;
 public sealed class ClubRepository(AppDbContext dbContext) : IClubRepository
 {
     public async Task<IReadOnlyList<Club>> ListAsync(
+        Guid currentUserId,
+        bool onlyOwnedClubs,
         string? search,
         string? category,
         CancellationToken cancellationToken)
@@ -20,6 +22,14 @@ public sealed class ClubRepository(AppDbContext dbContext) : IClubRepository
                 membership.Status == ClubMembershipStatus.Approved))
             .ThenInclude(membership => membership.User)
             .Where(club => club.Status == ClubStatus.Active);
+
+        if (onlyOwnedClubs)
+        {
+            query = query.Where(club => club.Memberships.Any(membership =>
+                membership.UserId == currentUserId &&
+                membership.Status == ClubMembershipStatus.Approved &&
+                membership.Role == ClubMembershipRole.President));
+        }
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -41,11 +51,25 @@ public sealed class ClubRepository(AppDbContext dbContext) : IClubRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<Club?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
+    public async Task<Club?> GetByIdAsync(
+        Guid id,
+        Guid currentUserId,
+        bool onlyOwnedClubs,
+        CancellationToken cancellationToken)
     {
-        return await ClubWithApprovedMembers()
+        var query = ClubWithApprovedMembers()
             .AsNoTracking()
-            .SingleOrDefaultAsync(club => club.Id == id, cancellationToken);
+            .Where(club => club.Id == id && club.Status == ClubStatus.Active);
+
+        if (onlyOwnedClubs)
+        {
+            query = query.Where(club => club.Memberships.Any(membership =>
+                membership.UserId == currentUserId &&
+                membership.Status == ClubMembershipStatus.Approved &&
+                membership.Role == ClubMembershipRole.President));
+        }
+
+        return await query.SingleOrDefaultAsync(cancellationToken);
     }
 
     public async Task<Club?> GetByIdForUpdateAsync(Guid id, CancellationToken cancellationToken)

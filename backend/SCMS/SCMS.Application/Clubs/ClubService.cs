@@ -9,17 +9,30 @@ namespace SCMS.Application.Clubs;
 public sealed class ClubService(IClubRepository clubRepository) : IClubService
 {
     public async Task<IReadOnlyList<ClubDto>> GetClubsAsync(
+        CurrentUserDto currentUser,
         string? search,
         string? category,
         CancellationToken cancellationToken)
     {
-        var clubs = await clubRepository.ListAsync(search, category, cancellationToken);
+        var clubs = await clubRepository.ListAsync(
+            currentUser.Id,
+            currentUser.IsClubLeader,
+            search,
+            category,
+            cancellationToken);
         return clubs.Select(ToDto).ToList();
     }
 
-    public async Task<ClubDto?> GetClubAsync(Guid id, CancellationToken cancellationToken)
+    public async Task<ClubDto?> GetClubAsync(
+        CurrentUserDto currentUser,
+        Guid id,
+        CancellationToken cancellationToken)
     {
-        var club = await clubRepository.GetByIdAsync(id, cancellationToken);
+        var club = await clubRepository.GetByIdAsync(
+            id,
+            currentUser.Id,
+            currentUser.IsClubLeader,
+            cancellationToken);
         return club is null ? null : ToDto(club);
     }
 

@@ -17,14 +17,24 @@ public sealed class ClubsController(
         [FromQuery] string? category,
         CancellationToken cancellationToken)
     {
-        var clubs = await clubService.GetClubsAsync(search, category, cancellationToken);
+        if (!this.TryGetCurrentUser(out var currentUser))
+        {
+            return Unauthorized();
+        }
+
+        var clubs = await clubService.GetClubsAsync(currentUser, search, category, cancellationToken);
         return Ok(clubs);
     }
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ClubDto>> GetClub(Guid id, CancellationToken cancellationToken)
     {
-        var club = await clubService.GetClubAsync(id, cancellationToken);
+        if (!this.TryGetCurrentUser(out var currentUser))
+        {
+            return Unauthorized();
+        }
+
+        var club = await clubService.GetClubAsync(currentUser, id, cancellationToken);
         return club is null ? NotFound() : Ok(club);
     }
 

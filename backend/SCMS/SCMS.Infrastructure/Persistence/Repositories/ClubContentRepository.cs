@@ -9,26 +9,54 @@ namespace SCMS.Infrastructure.Persistence.Repositories;
 
 public sealed class ClubContentRepository(AppDbContext dbContext) : IClubContentRepository
 {
-    public async Task<IReadOnlyList<Announcement>> ListAnnouncementsAsync(CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<Announcement>> ListAnnouncementsAsync(
+        Guid currentUserId,
+        bool includeAllClubs,
+        CancellationToken cancellationToken)
     {
-        return await dbContext.Announcements
+        var query = dbContext.Announcements
             .AsNoTracking()
             .Include(announcement => announcement.CreatedByUser)
             .Where(announcement =>
                 announcement.Status == AnnouncementStatus.Published &&
-                announcement.Club.Status == ClubStatus.Active)
+                announcement.Club.Status == ClubStatus.Active);
+
+        if (!includeAllClubs)
+        {
+            query = query.Where(announcement =>
+                announcement.Audience == AnnouncementAudience.Public ||
+                announcement.Club.Memberships.Any(membership =>
+                    membership.UserId == currentUserId &&
+                    membership.Status == ClubMembershipStatus.Approved));
+        }
+
+        return await query
             .OrderByDescending(announcement => announcement.PublishedAt ?? announcement.CreatedAt)
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<Event>> ListEventsAsync(CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<Event>> ListEventsAsync(
+        Guid currentUserId,
+        bool includeAllClubs,
+        CancellationToken cancellationToken)
     {
-        return await dbContext.Events
+        var query = dbContext.Events
             .AsNoTracking()
             .Include(clubEvent => clubEvent.CreatedByUser)
             .Where(clubEvent =>
                 clubEvent.Status == EventStatus.Published &&
-                clubEvent.Club.Status == ClubStatus.Active)
+                clubEvent.Club.Status == ClubStatus.Active);
+
+        if (!includeAllClubs)
+        {
+            query = query.Where(clubEvent =>
+                clubEvent.Visibility == EventVisibility.Public ||
+                clubEvent.Club.Memberships.Any(membership =>
+                    membership.UserId == currentUserId &&
+                    membership.Status == ClubMembershipStatus.Approved));
+        }
+
+        return await query
             .OrderBy(clubEvent => clubEvent.StartAt)
             .ToListAsync(cancellationToken);
     }

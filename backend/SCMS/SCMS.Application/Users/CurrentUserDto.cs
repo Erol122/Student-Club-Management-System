@@ -10,5 +10,6 @@ public sealed record CurrentUserDto(
     string Role,
     DateTimeOffset? LastLoginAt)
 {
-    public bool IsAdmin => string.Equals(Role, "Admin", StringComparison.OrdinalIgnoreCase);
+    public bool IsAdmin => string.Equals(Role, UserRoleLabels.Admin, StringComparison.OrdinalIgnoreCase);
+    public bool IsClubLeader => string.Equals(Role, UserRoleLabels.ClubLeader, StringComparison.OrdinalIgnoreCase);
 }

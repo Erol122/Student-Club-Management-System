@@ -121,9 +121,9 @@ public sealed class UserService(IUserRepository userRepository) : IUserService
     {
         return role switch
         {
-            AppRole.Admin => "Admin",
-            AppRole.ClubLeader => "Club Leader",
-            _ => "Member"
+            AppRole.Admin => UserRoleLabels.Admin,
+            AppRole.ClubLeader => UserRoleLabels.ClubLeader,
+            _ => UserRoleLabels.Member
         };
     }
 

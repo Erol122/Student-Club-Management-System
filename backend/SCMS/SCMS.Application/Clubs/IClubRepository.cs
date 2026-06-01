@@ -5,11 +5,17 @@ namespace SCMS.Application.Clubs;
 public interface IClubRepository
 {
     Task<IReadOnlyList<Club>> ListAsync(
+        Guid currentUserId,
+        bool onlyOwnedClubs,
         string? search,
         string? category,
         CancellationToken cancellationToken);
 
-    Task<Club?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
+    Task<Club?> GetByIdAsync(
+        Guid id,
+        Guid currentUserId,
+        bool onlyOwnedClubs,
+        CancellationToken cancellationToken);
 
     Task<Club?> GetByIdForUpdateAsync(Guid id, CancellationToken cancellationToken);
 

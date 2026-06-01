@@ -1,5 +1,6 @@
 import { memo, useMemo } from 'react';
 import { useAppDispatch } from '../../context/AppContext';
+import { APP_ROLES } from '../../domain/roles';
 import { SectionCard } from '../common/SectionCard';
 
 function timeAgo(ts) {
@@ -310,7 +311,7 @@ function MemberHome({ clubs, membershipRequests, announcements, events, currentU
 }
 
 export const DashboardView = memo(function DashboardView(props) {
-  if (props.activeRole === 'Admin') return <AdminHome {...props} />;
-  if (props.activeRole === 'Club Leader') return <LeaderHome {...props} />;
+  if (props.activeRole === APP_ROLES.Admin) return <AdminHome {...props} />;
+  if (props.activeRole === APP_ROLES.ClubLeader) return <LeaderHome {...props} />;
   return <MemberHome {...props} />;
 });

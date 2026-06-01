@@ -9,7 +9,7 @@ const TABS = [
   { id: 'announcements', label: 'Announcements' },
 ];
 
-function ClubDetails({
+function ClubDetailBody({
   selectedClub,
   clubDetailTab,
   announcements,
@@ -29,38 +29,8 @@ function ClubDetails({
     [events, selectedClubId]
   );
 
-  if (!selectedClub) {
-    return (
-      <SectionCard
-        className="club-detail-card"
-        title="Club details"
-        subtitle="Select a club once one is available from the backend."
-      >
-        <p className="empty-state">No club is selected right now.</p>
-      </SectionCard>
-    );
-  }
-
   return (
-    <SectionCard
-      className="club-detail-card"
-      title={selectedClub.name}
-      subtitle={`${selectedClub.category} · Led by ${selectedClub.leader}`}
-      actions={
-        selectedClub.groupLink ? (
-          <a
-            className="ghost-button link-button"
-            href={selectedClub.groupLink}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Join {selectedClub.groupPlatform || 'Group'}
-          </a>
-        ) : (
-          <span className="group-link-muted">No group link yet</span>
-        )
-      }
-    >
+    <>
       <p className="club-summary">{selectedClub.summary}</p>
 
       <div className="tab-bar">
@@ -144,7 +114,96 @@ function ClubDetails({
         </div>
       )}
 
+    </>
+  );
+}
+
+function ClubDetails(props) {
+  const { selectedClub } = props;
+
+  if (!selectedClub) {
+    return (
+      <SectionCard
+        className="club-detail-card"
+        title="Club details"
+        subtitle="Select a club once one is available from the backend."
+      >
+        <p className="empty-state">No club is selected right now.</p>
+      </SectionCard>
+    );
+  }
+
+  return (
+    <SectionCard
+      className="club-detail-card"
+      title={selectedClub.name}
+      subtitle={`${selectedClub.category} · Led by ${selectedClub.leader}`}
+      actions={
+        selectedClub.groupLink ? (
+          <a
+            className="ghost-button link-button"
+            href={selectedClub.groupLink}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Join {selectedClub.groupPlatform || 'Group'}
+          </a>
+        ) : (
+          <span className="group-link-muted">No group link yet</span>
+        )
+      }
+    >
+      <ClubDetailBody {...props} />
     </SectionCard>
+  );
+}
+
+function ClubDrawer({ selectedClub, clubDetailTab, announcements, events, onClose }) {
+  if (!selectedClub) return null;
+
+  return (
+    <>
+      <button
+        type="button"
+        className="club-drawer-scrim"
+        aria-label="Close club details"
+        onClick={onClose}
+      />
+      <aside className="club-drawer" aria-label={`${selectedClub.name} details`}>
+        <header className="club-drawer-header">
+          <div>
+            <span className="directory-category">{selectedClub.category}</span>
+            <h3>{selectedClub.name}</h3>
+            <p>Led by {selectedClub.leader}</p>
+          </div>
+          <button type="button" className="drawer-close-button" onClick={onClose} aria-label="Close details">
+            Close
+          </button>
+        </header>
+
+        <div className="club-drawer-actions">
+          {selectedClub.groupLink ? (
+            <a
+              className="ghost-button link-button"
+              href={selectedClub.groupLink}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Join {selectedClub.groupPlatform || 'Group'}
+            </a>
+          ) : (
+            <span className="group-link-muted">No group link yet</span>
+          )}
+        </div>
+
+        <ClubDetailBody
+          selectedClub={selectedClub}
+          clubDetailTab={clubDetailTab}
+          announcements={announcements}
+          events={events}
+        />
+      </aside>
+    </>
   );
 }
 
@@ -164,6 +223,7 @@ export const ClubsView = memo(function ClubsView({
   const dispatch = useAppDispatch();
   const { requestMembershipRecord } = useClubActions();
   const [memberView, setMemberView] = useState('my-clubs');
+  const [isDrawerOpen, setDrawerOpen] = useState(false);
   const categories = useMemo(() => ['All', ...new Set(clubs.map((club) => club.category))], [clubs]);
 
   const filterClubs = useCallback((clubList) => {
@@ -356,67 +416,49 @@ export const ClubsView = memo(function ClubsView({
         ))}
       </div>
 
-      <div className="directory-layout">
-        <SectionCard
-          title="Club directory"
-          subtitle={`${filteredClubs.length} club${filteredClubs.length === 1 ? '' : 's'} shown`}
-        >
-          <div className="directory-grid">
-            {filteredClubs.map((club) => {
-              const isSelected = selectedClubId === club.id;
-              const isMember = memberClubIds.includes(club.id);
-              const isPending = pendingClubIds.includes(club.id);
+      <SectionCard
+        className="club-list-card"
+        title="Club directory"
+        subtitle={`${filteredClubs.length} club${filteredClubs.length === 1 ? '' : 's'} shown`}
+      >
+        <div className="club-list">
+          {filteredClubs.length === 0 ? <p className="empty-state">No clubs match the current filters.</p> : null}
+          {filteredClubs.map((club) => {
+            const isSelected = selectedClubId === club.id;
 
-              return (
-                <article
-                  key={club.id}
-                  className={`directory-card ${isSelected ? 'selected' : ''}`.trim()}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => dispatch({ type: 'SELECT_CLUB', payload: club.id })}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      dispatch({ type: 'SELECT_CLUB', payload: club.id });
-                    }
-                  }}
-                >
-                  <div className="directory-card-top">
-                    <span className="directory-category">{club.category}</span>
-                    <span className="directory-open-hint">{isSelected ? 'Viewing now' : 'Click to view'}</span>
-                  </div>
-                  <h4>{club.name}</h4>
-                  <p>{club.summary}</p>
-                  <div className="directory-card-meta">
-                    <span>{club.leader}</span>
-                  </div>
+            return (
+              <button
+                key={club.id}
+                type="button"
+                className={`club-list-row ${isSelected ? 'selected' : ''}`.trim()}
+                onClick={() => {
+                  dispatch({ type: 'SELECT_CLUB', payload: club.id });
+                  setDrawerOpen(true);
+                }}
+              >
+                <span className="club-list-main">
+                  <strong>{club.name}</strong>
+                  <span>{club.summary}</span>
+                </span>
+                <span className="club-list-meta">
+                  <span>{club.category}</span>
+                  <span>{club.leader}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </SectionCard>
 
-                  {activeRole === 'Member' ? (
-                    <button
-                      type="button"
-                      className={`primary-button ${isMember || isPending ? 'is-muted' : ''}`.trim()}
-                      disabled={isMember || isPending}
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        await requestMembershipRecord(club.id);
-                      }}
-                    >
-                      {isMember ? 'Already a member' : isPending ? 'Request pending' : 'Request to join'}
-                    </button>
-                  ) : null}
-                </article>
-              );
-            })}
-          </div>
-        </SectionCard>
-
-        <ClubDetails
+      {isDrawerOpen ? (
+        <ClubDrawer
           selectedClub={selectedClub}
           clubDetailTab={clubDetailTab}
           announcements={announcements}
           events={events}
+          onClose={() => setDrawerOpen(false)}
         />
-      </div>
+      ) : null}
     </div>
   );
 });

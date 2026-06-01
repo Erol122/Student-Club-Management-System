@@ -448,8 +448,7 @@ textarea {
 .feed-list,
 .activity-log,
 .member-list,
-.stack-form,
-.role-grid {
+.stack-form {
   display: flex;
   flex-direction: column;
   gap: 9px;
@@ -459,7 +458,6 @@ textarea {
 .feed-item,
 .activity-item,
 .member-row,
-.role-card,
 .directory-card,
 .mini-card {
   background: rgba(255, 255, 255, 0.9);
@@ -471,7 +469,6 @@ textarea {
 .action-row,
 .feed-item,
 .member-row,
-.role-card,
 .activity-item {
   display: flex;
   align-items: center;
@@ -482,7 +479,6 @@ textarea {
 .action-row strong,
 .feed-item strong,
 .member-row strong,
-.role-card strong,
 .directory-card h4,
 .mini-card strong {
   display: block;
@@ -493,7 +489,6 @@ textarea {
 .action-row span,
 .feed-item p,
 .member-row p,
-.role-card p,
 .activity-item p,
 .directory-card p,
 .club-summary,

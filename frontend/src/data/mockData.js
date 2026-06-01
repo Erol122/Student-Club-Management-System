@@ -44,8 +44,8 @@ export const initialClubs = [
     groupLink: 'https://chat.whatsapp.com/robotics-ius-demo',
     announcementsCount: 3,
     members: [
-      { id: 'robotics-1', name: 'Mila', role: 'Club Leader', program: 'Software Engineering' },
-      { id: 'robotics-2', name: 'Noah', role: 'Vice Leader', program: 'Mechanical Engineering' },
+      { id: 'robotics-1', name: 'Mila', role: 'President', program: 'Software Engineering' },
+      { id: 'robotics-2', name: 'Noah', role: 'Vice President', program: 'Mechanical Engineering' },
       { id: 'robotics-3', name: 'Lana', role: 'Member', program: 'Computer Science' },
       { id: 'robotics-4', name: 'Alex', role: 'Member', program: 'Computer Science' },
     ],
@@ -64,8 +64,8 @@ export const initialClubs = [
     groupLink: 'https://chat.whatsapp.com/media-lab-ius-demo',
     announcementsCount: 2,
     members: [
-      { id: 'media-1', name: 'Nina', role: 'Club Leader', program: 'Visual Arts' },
-      { id: 'media-2', name: 'Omar', role: 'Content Lead', program: 'Media Studies' },
+      { id: 'media-1', name: 'Nina', role: 'President', program: 'Visual Arts' },
+      { id: 'media-2', name: 'Omar', role: 'Officer', program: 'Media Studies' },
       { id: 'media-3', name: 'Iva', role: 'Member', program: 'Architecture' },
     ],
   },
@@ -83,8 +83,8 @@ export const initialClubs = [
     groupLink: 'https://chat.whatsapp.com/debate-ius-demo',
     announcementsCount: 4,
     members: [
-      { id: 'debate-1', name: 'Leo', role: 'Club Leader', program: 'Law' },
-      { id: 'debate-2', name: 'Maya', role: 'Moderator', program: 'Political Science' },
+      { id: 'debate-1', name: 'Leo', role: 'President', program: 'Law' },
+      { id: 'debate-2', name: 'Maya', role: 'Officer', program: 'Political Science' },
       { id: 'debate-3', name: 'Eli', role: 'Member', program: 'International Relations' },
     ],
   },

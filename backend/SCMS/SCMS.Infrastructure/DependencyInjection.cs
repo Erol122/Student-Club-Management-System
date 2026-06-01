@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using SCMS.Application.ClubContent;
 using SCMS.Application.ClubWorkflows;
 using SCMS.Application.Clubs;
 using SCMS.Application.Users;
@@ -28,6 +29,7 @@ public static class DependencyInjection
             });
         });
 
+        services.AddScoped<IClubContentRepository, ClubContentRepository>();
         services.AddScoped<IClubRepository, ClubRepository>();
         services.AddScoped<IClubWorkflowRepository, ClubWorkflowRepository>();
         services.AddScoped<IUserRepository, UserRepository>();

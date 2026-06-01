@@ -62,12 +62,6 @@ function ClubDetails({
       }
     >
       <p className="club-summary">{selectedClub.summary}</p>
-      <div className="hero-tags">
-        <span>{selectedClub.members.length} members</span>
-        <span>{selectedClub.health}</span>
-        <span>Next: {selectedClub.nextEvent}</span>
-        <span>{selectedClub.groupPlatform || 'Group'}</span>
-      </div>
 
       <div className="tab-bar">
         {TABS.map((tab) => (
@@ -317,7 +311,6 @@ export const ClubsView = memo(function ClubsView({
                       <h4>{club.name}</h4>
                       <p>{club.summary}</p>
                       <div className="directory-card-meta">
-                        <span>{club.members.length} members</span>
                         <span>{club.leader}</span>
                       </div>
                       <button
@@ -395,7 +388,6 @@ export const ClubsView = memo(function ClubsView({
                   <h4>{club.name}</h4>
                   <p>{club.summary}</p>
                   <div className="directory-card-meta">
-                    <span>{club.members.length} members</span>
                     <span>{club.leader}</span>
                   </div>
 

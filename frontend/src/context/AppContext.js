@@ -3,10 +3,14 @@ import { useMsal } from '@azure/msal-react';
 import {
   approveClubProposal,
   approveJoinRequest,
+  createAnnouncement,
   createClub,
+  createEvent,
   deleteClub,
+  fetchAnnouncements,
   fetchClubProposals,
   fetchClubs,
+  fetchEvents,
   fetchJoinRequests,
   rejectClubProposal,
   rejectJoinRequest,
@@ -42,13 +46,14 @@ const DEFAULT_LEADER = 'Club admin';
 const ROLE_LABELS = {
   1: 'Member',
   2: 'Officer',
-  3: 'Vice Leader',
-  4: 'Club Leader',
+  3: 'Vice President',
+  4: 'President',
   Member: 'Member',
   Officer: 'Officer',
-  VicePresident: 'Vice Leader',
-  President: 'Club Leader',
+  VicePresident: 'Vice President',
+  President: 'President',
 };
+const CLUB_LEADER_MEMBER_ROLES = new Set(['President', 'Club Leader']);
 
 function logEntry(message, type = 'info') {
   return {
@@ -85,7 +90,7 @@ function mapApiClubToUi(dto, existingClub = null) {
     role: ROLE_LABELS[member.role] ?? member.role ?? 'Member',
     program: member.program ?? 'Student',
   }));
-  const owner = members.find((member) => member.role === 'Club Leader');
+  const owner = members.find((member) => CLUB_LEADER_MEMBER_ROLES.has(member.role));
 
   return {
     id: dto.id,
@@ -131,6 +136,35 @@ function mapJoinRequestToUi(dto) {
   };
 }
 
+function mapAnnouncementToUi(dto) {
+  const publishedAt = dto.publishedAt ?? dto.createdAt;
+  return {
+    id: dto.id,
+    clubId: dto.clubId,
+    title: dto.title,
+    body: dto.body,
+    audience: dto.audience ?? 'All members',
+    author: dto.author ?? 'Club admin',
+    date: fmtDate(publishedAt),
+    ts: publishedAt ? new Date(publishedAt).getTime() : Date.now(),
+  };
+}
+
+function mapEventToUi(dto) {
+  const startAt = dto.startAt ?? dto.date;
+  return {
+    id: dto.id,
+    clubId: dto.clubId,
+    title: dto.title,
+    description: dto.description ?? '',
+    date: startAt ? startAt.slice(0, 10) : '',
+    location: dto.location ?? 'TBA',
+    startAt,
+    endAt: dto.endAt,
+    rsvp: [],
+  };
+}
+
 function mapUiProposalToRequest(draft) {
   return {
     name: draft.name.trim(),
@@ -164,6 +198,27 @@ function mapUiClubToUpdateRequest(draft, currentClub) {
   };
 }
 
+function mapUiAnnouncementToRequest(draft) {
+  return {
+    title: draft.title.trim(),
+    body: draft.body.trim(),
+    audience: 'All members',
+  };
+}
+
+function mapUiEventToRequest(draft) {
+  const startAt = new Date(`${draft.date}T09:00:00`).toISOString();
+  const endAt = new Date(`${draft.date}T10:00:00`).toISOString();
+
+  return {
+    title: draft.title.trim(),
+    description: null,
+    location: draft.location.trim(),
+    startAt,
+    endAt,
+  };
+}
+
 function buildFieldError(problemBody) {
   if (!problemBody || typeof problemBody !== 'object') {
     return 'Could not save the club.';
@@ -190,7 +245,7 @@ function ownsAnyClub(user, clubs) {
   return clubs.some((club) =>
     club.members.some(
       (member) =>
-        member.role === 'Club Leader' &&
+        CLUB_LEADER_MEMBER_ROLES.has(member.role) &&
         (member.email === user.email || member.name === user.name)
     )
   );
@@ -299,6 +354,13 @@ function reducer(state, action) {
         ...state,
         clubRequests: action.payload.clubRequests.map(mapProposalToUi),
         membershipRequests: action.payload.membershipRequests.map(mapJoinRequestToUi),
+      };
+
+    case 'LOAD_CONTENT_SUCCESS':
+      return {
+        ...state,
+        announcements: action.payload.announcements.map(mapAnnouncementToUi),
+        events: action.payload.events.map(mapEventToUi),
       };
 
     case 'SAVE_CLUB_START':
@@ -454,19 +516,11 @@ function reducer(state, action) {
       };
     }
 
-    case 'PUBLISH_ANNOUNCEMENT': {
-      const ann = {
-        id: `ann-${Date.now()}`,
-        clubId: action.payload.clubId,
-        title: action.payload.title,
-        body: action.payload.body,
-        audience: action.payload.audience,
-        author: action.payload.author,
-        date: fmtDate(Date.now()),
-        ts: Date.now(),
-      };
+    case 'PUBLISH_ANNOUNCEMENT_SUCCESS': {
+      const ann = mapAnnouncementToUi(action.payload);
       return {
         ...state,
+        clubsSaving: false,
         announcements: [ann, ...state.announcements],
         activityLog: [
           logEntry(`Announcement published: "${ann.title}"`, 'announcement'),
@@ -476,18 +530,12 @@ function reducer(state, action) {
       };
     }
 
-    case 'SCHEDULE_EVENT': {
-      const evt = {
-        id: `evt-${Date.now()}`,
-        clubId: action.payload.clubId,
-        title: action.payload.title,
-        date: action.payload.date,
-        location: action.payload.location,
-        rsvp: [],
-      };
+    case 'SCHEDULE_EVENT_SUCCESS': {
+      const evt = mapEventToUi(action.payload);
       return {
         ...state,
-        events: [evt, ...state.events],
+        clubsSaving: false,
+        events: [...state.events, evt].sort((a, b) => new Date(a.date) - new Date(b.date)),
         activityLog: [
           logEntry(`Event scheduled: "${evt.title}" on ${evt.date}`, 'event'),
           ...state.activityLog,
@@ -510,23 +558,6 @@ function reducer(state, action) {
               }
             : evt
         ),
-      };
-    }
-
-    case 'UPDATE_ROLE': {
-      return {
-        ...state,
-        clubs: state.clubs.map((club) =>
-          club.id === action.payload.clubId
-            ? {
-                ...club,
-                members: club.members.map((m) =>
-                  m.id === action.payload.memberId ? { ...m, role: action.payload.role } : m
-                ),
-              }
-            : club
-        ),
-        toast: { message: `Role updated to ${action.payload.role}`, type: 'success' },
       };
     }
 
@@ -582,13 +613,16 @@ export function useClubActions() {
 
       try {
         const auth = getAuth();
-        const [clubList, clubRequests, membershipRequests] = await Promise.all([
+        const [clubList, clubRequests, membershipRequests, announcements, events] = await Promise.all([
           fetchClubs(auth),
           fetchClubProposals(auth),
           fetchJoinRequests(auth),
+          fetchAnnouncements(auth),
+          fetchEvents(auth),
         ]);
         dispatch({ type: 'LOAD_CLUBS_SUCCESS', payload: clubList });
         dispatch({ type: 'LOAD_WORKFLOW_SUCCESS', payload: { clubRequests, membershipRequests } });
+        dispatch({ type: 'LOAD_CONTENT_SUCCESS', payload: { announcements, events } });
       } catch (error) {
         dispatch({
           type: 'LOAD_CLUBS_FAILURE',
@@ -720,6 +754,42 @@ export function useClubActions() {
           'Interested in contributing to workshops and weekly activities.'
         );
         dispatch({ type: 'REQUEST_MEMBERSHIP', payload: clubId, meta: request });
+        return true;
+      } catch (error) {
+        dispatch({
+          type: 'SAVE_CLUB_FAILURE',
+          payload: buildFieldError(error.body) || error.message,
+        });
+        return false;
+      }
+    },
+
+    async publishAnnouncementRecord(clubId, draft) {
+      dispatch({ type: 'SAVE_CLUB_START' });
+
+      try {
+        const announcement = await createAnnouncement(
+          getAuth(),
+          clubId,
+          mapUiAnnouncementToRequest(draft)
+        );
+        dispatch({ type: 'PUBLISH_ANNOUNCEMENT_SUCCESS', payload: announcement });
+        return true;
+      } catch (error) {
+        dispatch({
+          type: 'SAVE_CLUB_FAILURE',
+          payload: buildFieldError(error.body) || error.message,
+        });
+        return false;
+      }
+    },
+
+    async scheduleEventRecord(clubId, draft) {
+      dispatch({ type: 'SAVE_CLUB_START' });
+
+      try {
+        const event = await createEvent(getAuth(), clubId, mapUiEventToRequest(draft));
+        dispatch({ type: 'SCHEDULE_EVENT_SUCCESS', payload: event });
         return true;
       } catch (error) {
         dispatch({

@@ -3,6 +3,8 @@ import { apiFetch } from '../api/client';
 const CLUBS_API_PATH = '/api/clubs';
 const CLUB_PROPOSALS_API_PATH = '/api/club-proposals';
 const JOIN_REQUESTS_API_PATH = '/api/join-requests';
+const ANNOUNCEMENTS_API_PATH = '/api/announcements';
+const EVENTS_API_PATH = '/api/events';
 
 export async function parseResponse(response) {
   const contentType = response.headers.get('content-type') ?? '';
@@ -95,12 +97,42 @@ export async function fetchJoinRequests(auth) {
   return parseResponse(response);
 }
 
+export async function fetchAnnouncements(auth) {
+  const response = await apiFetch(auth.instance, auth.account, ANNOUNCEMENTS_API_PATH);
+  return parseResponse(response);
+}
+
+export async function fetchEvents(auth) {
+  const response = await apiFetch(auth.instance, auth.account, EVENTS_API_PATH);
+  return parseResponse(response);
+}
+
 export async function submitJoinRequest(auth, clubId, message) {
   const response = await apiFetch(
     auth.instance,
     auth.account,
     `${CLUBS_API_PATH}/${clubId}/join-requests`,
     toJsonRequest({ message }, 'POST')
+  );
+  return parseResponse(response);
+}
+
+export async function createAnnouncement(auth, clubId, payload) {
+  const response = await apiFetch(
+    auth.instance,
+    auth.account,
+    `${CLUBS_API_PATH}/${clubId}/announcements`,
+    toJsonRequest(payload, 'POST')
+  );
+  return parseResponse(response);
+}
+
+export async function createEvent(auth, clubId, payload) {
+  const response = await apiFetch(
+    auth.instance,
+    auth.account,
+    `${CLUBS_API_PATH}/${clubId}/events`,
+    toJsonRequest(payload, 'POST')
   );
   return parseResponse(response);
 }

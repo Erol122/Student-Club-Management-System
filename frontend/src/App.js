@@ -14,6 +14,16 @@ const DashboardView = lazy(() => import('./components/views/DashboardView').then
 const ClubsView = lazy(() => import('./components/views/ClubsView').then((m) => ({ default: m.ClubsView })));
 const OperationsView = lazy(() => import('./components/views/OperationsView').then((m) => ({ default: m.OperationsView })));
 
+function isClubLedByUser(club, user) {
+  if (!club || !user) return false;
+
+  return club.members.some(
+    (member) =>
+      (member.role === 'President' || member.role === 'Club Leader') &&
+      (member.userId === user.id || member.email === user.email || member.name === user.name)
+  );
+}
+
 const AuthenticatedShell = memo(function AuthenticatedShell({ currentUser }) {
   const dispatch = useAppDispatch();
   const { reloadWorkspace } = useClubActions();
@@ -32,12 +42,36 @@ const AuthenticatedShell = memo(function AuthenticatedShell({ currentUser }) {
     clubDetailTab,
   } = useAppState();
 
-  const selectedClub = useMemo(
-    () => clubs.find((c) => c.id === selectedClubId) ?? clubs[0] ?? null,
-    [clubs, selectedClubId]
+  const visibleClubs = useMemo(
+    () =>
+      activeRole === 'Club Leader'
+        ? clubs.filter((club) => isClubLedByUser(club, currentUser))
+        : clubs,
+    [activeRole, clubs, currentUser]
   );
 
-  const pendingCount = clubRequests.length + membershipRequests.length;
+  const visibleClubIds = useMemo(
+    () => new Set(visibleClubs.map((club) => club.id)),
+    [visibleClubs]
+  );
+
+  const visibleMembershipRequests = useMemo(
+    () =>
+      activeRole === 'Club Leader'
+        ? membershipRequests.filter((request) => visibleClubIds.has(request.clubId))
+        : membershipRequests,
+    [activeRole, membershipRequests, visibleClubIds]
+  );
+
+  const selectedClub = useMemo(
+    () => visibleClubs.find((c) => c.id === selectedClubId) ?? visibleClubs[0] ?? null,
+    [visibleClubs, selectedClubId]
+  );
+
+  const pendingCount =
+    activeRole === 'Club Leader'
+      ? visibleMembershipRequests.length
+      : clubRequests.length + membershipRequests.length;
 
   useEffect(() => {
     reloadWorkspace();
@@ -64,9 +98,9 @@ const AuthenticatedShell = memo(function AuthenticatedShell({ currentUser }) {
             <DashboardView
               activeRole={activeRole}
               currentUser={currentUser}
-              clubs={clubs}
+              clubs={visibleClubs}
               clubRequests={clubRequests}
-              membershipRequests={membershipRequests}
+              membershipRequests={visibleMembershipRequests}
               announcements={announcements}
               events={events}
               activityLog={activityLog}
@@ -78,13 +112,13 @@ const AuthenticatedShell = memo(function AuthenticatedShell({ currentUser }) {
             <ClubsView
               activeRole={activeRole}
               currentUser={currentUser}
-              clubs={clubs}
+              clubs={visibleClubs}
               selectedClub={selectedClub}
-              selectedClubId={selectedClubId}
+              selectedClubId={selectedClub?.id ?? ''}
               clubDetailTab={clubDetailTab}
               announcements={announcements}
               events={events}
-              membershipRequests={membershipRequests}
+              membershipRequests={visibleMembershipRequests}
               searchQuery={searchQuery}
               categoryFilter={categoryFilter}
             />
@@ -94,9 +128,9 @@ const AuthenticatedShell = memo(function AuthenticatedShell({ currentUser }) {
             <OperationsView
               activeRole={activeRole}
               currentUser={currentUser}
-              clubs={clubs}
+              clubs={visibleClubs}
               clubRequests={clubRequests}
-              membershipRequests={membershipRequests}
+              membershipRequests={visibleMembershipRequests}
               selectedClub={selectedClub}
               announcements={announcements}
               events={events}

@@ -1,7 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using SCMS.Application.ClubContent;
+using SCMS.Application.ClubWorkflows;
+using SCMS.Application.Clubs;
+using SCMS.Application.Users;
 using SCMS.Infrastructure.Persistence;
+using SCMS.Infrastructure.Persistence.Repositories;
 
 namespace SCMS.Infrastructure;
 
@@ -23,6 +28,11 @@ public static class DependencyInjection
                 sqlServerOptions.EnableRetryOnFailure();
             });
         });
+
+        services.AddScoped<IClubContentRepository, ClubContentRepository>();
+        services.AddScoped<IClubRepository, ClubRepository>();
+        services.AddScoped<IClubWorkflowRepository, ClubWorkflowRepository>();
+        services.AddScoped<IUserRepository, UserRepository>();
 
         return services;
     }

@@ -1,381 +1,779 @@
-import { memo, useMemo, useState } from 'react';
-import { useAppDispatch } from '../../context/AppContext';
+import { memo, useEffect, useMemo, useState } from 'react';
+import { useAppState, useAppDispatch } from '../../context/AppContext';
+import { useClubActions } from '../../context/clubActions';
+import { APP_ROLES, CLUB_MEMBER_ROLES } from '../../domain/roles';
+import { clubProposalImages, clubProposalImageByKey } from '../../data/clubProposalImages';
+import { ClubCategoryField } from '../common/ClubCategoryField';
+import { ClubDrawer } from '../common/ClubDrawer';
+import { ClubThumbnail } from '../common/ClubMedia';
+import { SectionCard } from '../common/SectionCard';
 
-// ── Shared helpers ────────────────────────────────────────────────────────────
+const emptyAnnouncement = { title: '', body: '' };
+const emptyEvent = { title: '', date: '', time: '', location: '' };
+const emptyClubProposal = { name: '', category: '', mission: '', imageKey: '' };
 
-function TabBar({ tabs, active, onChange }) {
+function ProposalImagePicker({ value, onChange }) {
   return (
-    <div className="ops-tab-bar">
-      {tabs.map((t) => (
+    <fieldset className="proposal-image-picker">
+      <legend>Image</legend>
+      <div className="proposal-image-options">
         <button
-          key={t.id}
           type="button"
-          className={`ops-tab-btn ${active === t.id ? 'active' : ''}`}
-          onClick={() => onChange(t.id)}
+          className={`proposal-image-option proposal-image-none ${!value ? 'selected' : ''}`.trim()}
+          onClick={() => onChange('')}
         >
-          {t.label}
-          {t.count > 0 && <span className="ops-tab-badge">{t.count}</span>}
+          No image
         </button>
-      ))}
-    </div>
+        {clubProposalImages.map((image) => (
+          <button
+            key={image.key}
+            type="button"
+            className={`proposal-image-option ${value === image.key ? 'selected' : ''}`.trim()}
+            onClick={() => onChange(image.key)}
+          >
+            <img src={image.src} alt="" loading="lazy" />
+            <span>{image.label}</span>
+          </button>
+        ))}
+      </div>
+    </fieldset>
   );
 }
 
-function EmptySlate({ text }) {
-  return <div className="empty-state" style={{ padding: '28px 18px', textAlign: 'center' }}>{text}</div>;
+function ProposalThumbnail({ imageKey }) {
+  const image = clubProposalImageByKey.get(imageKey);
+  if (!image) return null;
+
+  return <img className="proposal-list-image" src={image.src} alt="" loading="lazy" />;
 }
 
-// ── Admin ─────────────────────────────────────────────────────────────────────
-
-function AdminOps({ clubs, clubRequests, membershipRequests }) {
+// ── Admin: redirect to Clubs (everything is managed there) ─────────────────
+function AdminRedirect() {
   const dispatch = useAppDispatch();
+  useEffect(() => {
+    dispatch({ type: 'NAVIGATE', payload: 'clubs' });
+  }, [dispatch]);
+  return null;
+}
 
-  const TABS = [
-    { id: 'clubs',       label: 'Club Requests',    count: clubRequests.length },
-    { id: 'memberships', label: 'Memberships',       count: membershipRequests.length },
-    { id: 'platform',    label: 'Platform Overview', count: 0 },
+// ── Club Leader ────────────────────────────────────────────────────────────
+function LeaderManage({ clubs, clubRequests: allClubRequests, selectedClub, membershipRequests, announcements, events, clubDetailTab, currentUser }) {
+  const dispatch = useAppDispatch();
+  const {
+    approveMembershipRecord,
+    publishAnnouncementRecord,
+    rejectMembershipRecord,
+    scheduleEventRecord,
+    submitClubProposalRecord,
+    updateClubRecord,
+    updateAnnouncementRecord,
+    deleteAnnouncementRecord,
+    updateEventRecord,
+    deleteEventRecord,
+  } = useClubActions();
+  const { clubsSaving } = useAppState();
+
+  const [activeTab, setActiveTab] = useState('requests');
+  const [editingAnnouncement, setEditingAnnouncement] = useState(null);
+  const [editingEvent, setEditingEvent] = useState(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerClubId, setDrawerClubId] = useState(null);
+  const [seenRequestsTab, setSeenRequestsTab] = useState(false);
+
+  const leaderClubs = useMemo(
+    () => clubs.filter((club) =>
+      club.members.some((m) =>
+        (m.email === currentUser?.email || m.name === currentUser?.name) &&
+        m.role === CLUB_MEMBER_ROLES.President
+      )
+    ),
+    [clubs, currentUser?.email, currentUser?.name]
+  );
+
+  const activeClub = useMemo(
+    () => leaderClubs.find((c) => c.id === selectedClub?.id) ?? leaderClubs[0] ?? null,
+    [leaderClubs, selectedClub?.id]
+  );
+  const [announcementDraft, setAnnouncementDraft] = useState(emptyAnnouncement);
+  const [eventDraft, setEventDraft] = useState(emptyEvent);
+  const [clubDraft, setClubDraft] = useState(emptyClubProposal);
+
+  const activeClubId = activeClub?.id ?? null;
+  const today = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }, []);
+
+  const clubRequests = useMemo(
+    () => membershipRequests.filter((req) => req.clubId === activeClubId),
+    [membershipRequests, activeClubId]
+  );
+  const clubAnnouncements = useMemo(
+    () => [...announcements.filter((a) => a.clubId === activeClubId)]
+      .sort((a, b) => new Date(b.date) - new Date(a.date)),
+    [announcements, activeClubId]
+  );
+  const clubEvents = useMemo(
+    () => events
+      .filter((e) => e.clubId === activeClubId && new Date(e.startAt) >= new Date(today))
+      .sort((a, b) => new Date(a.startAt) - new Date(b.startAt)),
+    [events, activeClubId, today]
+  );
+
+  const drawerClub = useMemo(
+    () => leaderClubs.find((c) => c.id === drawerClubId) ?? null,
+    [leaderClubs, drawerClubId]
+  );
+
+  const myProposals = useMemo(
+    () => (allClubRequests ?? []).filter(
+      (req) => req.proposedByEmail === currentUser?.email || req.proposedBy === currentUser?.name
+    ),
+    [allClubRequests, currentUser?.email, currentUser?.name]
+  );
+
+  const myJoinRequests = useMemo(
+    () => membershipRequests.filter(
+      (req) => req.email === currentUser?.email || req.student === currentUser?.name
+    ),
+    [membershipRequests, currentUser?.email, currentUser?.name]
+  );
+
+  if (!activeClub) {
+    return <p className="empty-state">No club is available to manage yet.</p>;
+  }
+
+  const tabs = [
+    { id: 'requests', label: 'Requests', count: clubRequests.length },
+    { id: 'announcements', label: 'Announcements' },
+    { id: 'events', label: 'Events' },
+    { id: 'my-proposals', label: 'My Proposals', count: myProposals.filter((p) => !p.status || p.status === 'Pending').length },
+    { id: 'my-requests', label: 'My Join Requests', count: seenRequestsTab ? 0 : myJoinRequests.length },
+    { id: 'propose', label: 'Propose a Club' },
   ];
 
-  const [tab, setTab] = useState('clubs');
-
   return (
-    <div className="ops-layout">
-      <TabBar tabs={TABS} active={tab} onChange={setTab} />
+    <div className="page-stack">
+      {/* Club directory — click to manage */}
+      <SectionCard
+        title="My clubs"
+        subtitle={`${leaderClubs.length} club${leaderClubs.length === 1 ? '' : 's'} you manage — click to open`}
+      >
+        <div className="club-list">
+          {leaderClubs.map((club) => (
+            <button
+              key={club.id}
+              type="button"
+              className={`club-list-row ${drawerOpen && drawerClubId === club.id ? 'selected' : ''}`.trim()}
+              onClick={() => { setDrawerClubId(club.id); setDrawerOpen(true); }}
+            >
+              <ClubThumbnail imageKey={club.imageKey} name={club.name} />
+              <span className="club-list-main">
+                <strong>{club.name}</strong>
+                <span>{club.summary}</span>
+              </span>
+              <span className="club-list-meta">
+                <span>{club.category}</span>
+                <span>{club.members.length} members</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </SectionCard>
 
-      {tab === 'clubs' && (
-        <div className="ops-content">
-          {clubRequests.length === 0 ? (
-            <EmptySlate text="No pending club proposals — the queue is clear." />
-          ) : (
-            <div className="action-list">
-              {clubRequests.map((req) => (
-                <article key={req.id} className="action-row">
-                  <div>
-                    <strong>{req.name}</strong>
-                    <p>{req.category} · Proposed by {req.proposedBy}</p>
-                    <span>{req.mission}</span>
-                  </div>
-                  <div className="inline-actions">
-                    <button type="button" className="ghost-button" onClick={() => dispatch({ type: 'REJECT_CLUB', payload: req.id })}>Reject</button>
-                    <button type="button" className="primary-button" onClick={() => dispatch({ type: 'APPROVE_CLUB', payload: req.id })}>Approve</button>
-                  </div>
-                </article>
+      {drawerOpen && drawerClub ? (
+        <ClubDrawer
+          key={drawerClub.id}
+          selectedClub={drawerClub}
+          clubDetailTab={clubDetailTab}
+          announcements={announcements}
+          events={events}
+          onClose={() => setDrawerOpen(false)}
+          onSave={(draft) => updateClubRecord(drawerClub.id, draft)}
+          isSaving={clubsSaving}
+        />
+      ) : null}
+
+      {/* Club header */}
+      <section className="manage-club-header">
+        {leaderClubs.length > 1 ? (
+          <div className="club-switcher">
+            <span className="club-switcher-label">Managing</span>
+            <select
+              className="club-switcher-select"
+              value={activeClub.id}
+              onChange={(e) => dispatch({ type: 'SELECT_CLUB', payload: e.target.value })}
+            >
+              {leaderClubs.map((club) => (
+                <option key={club.id} value={club.id}>{club.name}</option>
               ))}
-            </div>
-          )}
+            </select>
+          </div>
+        ) : null}
+        <span className="directory-category">{activeClub.category}</span>
+        <h2>{activeClub.name}</h2>
+        <p>{activeClub.summary}</p>
+        <div className="dash-stats">
+          <article className="dash-stat">
+            <strong>{activeClub.members.length}</strong>
+            <span>Members</span>
+          </article>
+          <article className={`dash-stat ${clubRequests.length > 0 ? 'dash-stat--urgent' : ''}`}>
+            <strong>{clubRequests.length}</strong>
+            <span>Pending requests</span>
+          </article>
+          <article className="dash-stat">
+            <strong>{clubEvents.length}</strong>
+            <span>Upcoming events</span>
+          </article>
+          <article className="dash-stat">
+            <strong>{clubAnnouncements.length}</strong>
+            <span>Announcements</span>
+          </article>
         </div>
-      )}
+      </section>
 
-      {tab === 'memberships' && (
-        <div className="ops-content">
-          {membershipRequests.length === 0 ? (
-            <EmptySlate text="No pending membership requests across any club." />
-          ) : (
-            <div className="action-list">
-              {membershipRequests.map((req) => {
-                const club = clubs.find((c) => c.id === req.clubId);
-                return (
-                  <article key={req.id} className="action-row">
-                    <div>
-                      <strong>{req.student}</strong>
-                      <p>{req.program} · applying to <strong>{club?.name}</strong></p>
-                      <span>{req.reason}</span>
-                    </div>
-                    <div className="inline-actions">
-                      <button type="button" className="ghost-button" onClick={() => dispatch({ type: 'DECLINE_MEMBERSHIP', payload: req.id })}>Decline</button>
-                      <button type="button" className="primary-button" onClick={() => dispatch({ type: 'APPROVE_MEMBERSHIP', payload: req.id })}>Approve</button>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
+      {/* Tab navigation */}
+      <div className="tab-bar">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`.trim()}
+            onClick={() => { setActiveTab(tab.id); if (tab.id === 'my-requests') setSeenRequestsTab(true); }}
+          >
+            {tab.label}
+            {tab.count > 0 ? <span className="tab-badge">{tab.count}</span> : null}
+          </button>
+        ))}
+      </div>
 
-      {tab === 'platform' && (
-        <div className="ops-content">
-          <div className="mini-club-grid">
-            {clubs.map((club) => (
-              <article key={club.id} className="mini-club-card" style={{ '--card-accent': club.accent }}>
+      {/* Requests tab */}
+      {activeTab === 'requests' && (
+        <SectionCard
+          title="Membership requests"
+          subtitle={
+            clubRequests.length === 0
+              ? 'All caught up — no pending requests'
+              : `${clubRequests.length} student${clubRequests.length === 1 ? '' : 's'} waiting for a decision`
+          }
+        >
+          <div className="action-list">
+            {clubRequests.length === 0 ? (
+              <p className="empty-state">No pending membership requests right now.</p>
+            ) : null}
+            {clubRequests.map((req) => (
+              <article key={req.id} className="action-row">
                 <div>
-                  <strong>{club.name}</strong>
-                  <p style={{ margin: '4px 0 0', color: 'var(--muted)', fontSize: '0.82rem' }}>{club.category} · {club.health}</p>
+                  <strong>{req.student}</strong>
+                  <p>{req.program}{req.reason ? ` · ${req.reason}` : ''}</p>
                 </div>
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <span style={{ display: 'block', fontWeight: 800, fontSize: '1.2rem' }}>{club.members.length}</span>
-                  <span style={{ color: 'var(--muted)', fontSize: '0.76rem' }}>members</span>
+                <div className="inline-actions">
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    onClick={() => rejectMembershipRecord(req.id)}
+                    disabled={clubsSaving}
+                  >
+                    Decline
+                  </button>
+                  <button
+                    type="button"
+                    className="primary-button"
+                    onClick={() => approveMembershipRecord(req.id)}
+                    disabled={clubsSaving}
+                  >
+                    Approve
+                  </button>
                 </div>
               </article>
             ))}
           </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Club Leader ───────────────────────────────────────────────────────────────
-
-const emptyAnn  = { title: '', body: '', audience: 'All members' };
-const emptyEvt  = { title: '', date: '', location: '' };
-const emptyClub = { name: '', category: '', proposedBy: '', mission: '' };
-
-function LeaderOps({ selectedClub, membershipRequests, announcements, events }) {
-  const dispatch = useAppDispatch();
-
-  const clubReqs  = useMemo(() => membershipRequests.filter((r) => r.clubId === selectedClub.id), [membershipRequests, selectedClub.id]);
-  const clubAnns  = useMemo(() => announcements.filter((a) => a.clubId === selectedClub.id), [announcements, selectedClub.id]);
-  const clubEvts  = useMemo(() => events.filter((e) => e.clubId === selectedClub.id), [events, selectedClub.id]);
-
-  const TABS = [
-    { id: 'requests',      label: 'Requests',      count: clubReqs.length },
-    { id: 'announcements', label: 'Announcements',  count: 0 },
-    { id: 'events',        label: 'Events',         count: 0 },
-    { id: 'roles',         label: 'Roles',          count: 0 },
-    { id: 'new-club',      label: 'Propose Club',   count: 0 },
-  ];
-
-  const [tab, setTab]        = useState('requests');
-  const [annDraft, setAnn]   = useState(emptyAnn);
-  const [evtDraft, setEvt]   = useState(emptyEvt);
-  const [clubDraft, setClub] = useState(emptyClub);
-  const today = useMemo(() => new Date().toISOString().split('T')[0], []);
-
-  const submitAnn = (e) => {
-    e.preventDefault();
-    dispatch({ type: 'PUBLISH_ANNOUNCEMENT', payload: { ...annDraft, clubId: selectedClub.id, author: selectedClub.leader } });
-    setAnn(emptyAnn);
-  };
-
-  const submitEvt = (e) => {
-    e.preventDefault();
-    dispatch({ type: 'SCHEDULE_EVENT', payload: { ...evtDraft, clubId: selectedClub.id } });
-    setEvt(emptyEvt);
-  };
-
-  const submitClub = (e) => {
-    e.preventDefault();
-    dispatch({ type: 'SUBMIT_CLUB_REQUEST', payload: clubDraft });
-    setClub(emptyClub);
-  };
-
-  return (
-    <div className="ops-layout">
-      <TabBar tabs={TABS} active={tab} onChange={setTab} />
-
-      {tab === 'requests' && (
-        <div className="ops-content">
-          {clubReqs.length === 0 ? (
-            <EmptySlate text={`No pending membership requests for ${selectedClub.name}.`} />
-          ) : (
-            <div className="action-list">
-              {clubReqs.map((req) => (
-                <article key={req.id} className="action-row">
-                  <div>
-                    <strong>{req.student}</strong>
-                    <p>{req.program}</p>
-                    <span>{req.reason}</span>
-                  </div>
-                  <div className="inline-actions">
-                    <button type="button" className="ghost-button" onClick={() => dispatch({ type: 'DECLINE_MEMBERSHIP', payload: req.id })}>Decline</button>
-                    <button type="button" className="primary-button" onClick={() => dispatch({ type: 'APPROVE_MEMBERSHIP', payload: req.id })}>Approve</button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </div>
+        </SectionCard>
       )}
 
-      {tab === 'announcements' && (
-        <div className="ops-content ops-two-col">
-          <div>
-            <p className="ops-section-label">New announcement</p>
-            <form className="stack-form" onSubmit={submitAnn}>
-              <label>Title<input value={annDraft.title} onChange={(e) => setAnn((d) => ({ ...d, title: e.target.value }))} required /></label>
-              <label>
-                Audience
-                <select value={annDraft.audience} onChange={(e) => setAnn((d) => ({ ...d, audience: e.target.value }))}>
-                  <option>All members</option>
-                  <option>Leadership team</option>
-                  <option>Open to campus</option>
-                </select>
-              </label>
-              <label>Body<textarea rows="4" value={annDraft.body} onChange={(e) => setAnn((d) => ({ ...d, body: e.target.value }))} required /></label>
-              <button type="submit" className="primary-button">Publish announcement</button>
-            </form>
-          </div>
-          <div>
-            <p className="ops-section-label">Published ({clubAnns.length})</p>
+      {/* Announcements tab */}
+      {activeTab === 'announcements' && (
+        <div className="dashboard-grid">
+          <SectionCard
+            title="Recent announcements"
+            subtitle={`${clubAnnouncements.length} post${clubAnnouncements.length === 1 ? '' : 's'} shared`}
+          >
             <div className="feed-list">
-              {clubAnns.length === 0
-                ? <EmptySlate text="No announcements yet." />
-                : clubAnns.map((a) => (
-                    <article key={a.id} className="feed-item">
-                      <div><strong>{a.title}</strong><p>{a.author} · {a.audience}</p></div>
-                      <span>{a.date}</span>
-                    </article>
-                  ))}
+              {clubAnnouncements.length === 0 ? (
+                <p className="empty-state">No announcements posted yet.</p>
+              ) : null}
+              {clubAnnouncements.map((item) => (
+                <article key={item.id} className="feed-item">
+                  <div className="feed-item-content">
+                    <strong>{item.title}</strong>
+                    <p>{item.body}</p>
+                  </div>
+                  <div className="feed-item-actions">
+                    <span className="feed-item-date">{item.date}</span>
+                    <button type="button" className="ghost-button btn-sm" onClick={() => setEditingAnnouncement({ id: item.id, title: item.title, body: item.body })} disabled={clubsSaving}>Edit</button>
+                    <button type="button" className="danger-button btn-sm" onClick={() => deleteAnnouncementRecord(item.id)} disabled={clubsSaving}>Delete</button>
+                  </div>
+                </article>
+              ))}
             </div>
-          </div>
-        </div>
-      )}
+          </SectionCard>
 
-      {tab === 'events' && (
-        <div className="ops-content ops-two-col">
-          <div>
-            <p className="ops-section-label">Schedule event</p>
-            <form className="stack-form" onSubmit={submitEvt}>
-              <label>Event title<input value={evtDraft.title} onChange={(e) => setEvt((d) => ({ ...d, title: e.target.value }))} required /></label>
-              <label>Date<input type="date" value={evtDraft.date} min={today} onChange={(e) => setEvt((d) => ({ ...d, date: e.target.value }))} required /></label>
-              <label>Location<input value={evtDraft.location} onChange={(e) => setEvt((d) => ({ ...d, location: e.target.value }))} required /></label>
-              <button type="submit" className="primary-button">Schedule event</button>
+          <SectionCard title="Post new announcement" subtitle="Share a quick update with your members">
+            <form
+              className="stack-form"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const published = await publishAnnouncementRecord(activeClub.id, announcementDraft);
+                if (published) setAnnouncementDraft(emptyAnnouncement);
+              }}
+            >
+              <label>Title<input value={announcementDraft.title} onChange={(e) => setAnnouncementDraft((prev) => ({ ...prev, title: e.target.value }))} placeholder="What's the update?" required /></label>
+              <label>Message<textarea rows="5" value={announcementDraft.body} onChange={(e) => setAnnouncementDraft((prev) => ({ ...prev, body: e.target.value }))} placeholder="Write your announcement here..." required /></label>
+              <button type="submit" className="primary-button" disabled={clubsSaving}>{clubsSaving ? 'Publishing...' : 'Publish announcement'}</button>
             </form>
-          </div>
-          <div>
-            <p className="ops-section-label">RSVP status</p>
-            <div className="event-stack">
-              {clubEvts.length === 0
-                ? <EmptySlate text="No events scheduled yet." />
-                : clubEvts.map((evt) => (
-                    <article key={evt.id} className="event-card">
-                      <div className="event-card-header">
-                        <div>
-                          <strong>{evt.title}</strong>
-                          <p>{evt.date} · {evt.location}</p>
-                        </div>
-                        <span className="rsvp-count">{evt.rsvp.length} going</span>
-                      </div>
-                      {evt.rsvp.length > 0 && (
-                        <div className="attendance-chip-row" style={{ marginTop: 12 }}>
-                          {evt.rsvp.map((name) => (
-                            <span key={name} className="attendance-chip checked">{name}</span>
-                          ))}
-                        </div>
-                      )}
-                    </article>
-                  ))}
-            </div>
-          </div>
+          </SectionCard>
         </div>
       )}
 
-      {tab === 'roles' && (
-        <div className="ops-content">
-          <p className="ops-section-label">Role assignment — {selectedClub.name}</p>
-          <div className="role-grid">
-            {selectedClub.members.map((m) => (
-              <article key={m.id} className="role-card">
-                <div>
-                  <strong>{m.name}</strong>
-                  <p>{m.program}</p>
+      {/* Events tab */}
+      {activeTab === 'events' && (
+        <div className="dashboard-grid">
+          <SectionCard
+            title="Upcoming events"
+            subtitle={`${clubEvents.length} event${clubEvents.length === 1 ? '' : 's'} scheduled`}
+          >
+            <div className="feed-list">
+              {clubEvents.length === 0 ? (
+                <p className="empty-state">No upcoming events. Schedule one to keep members engaged.</p>
+              ) : null}
+              {clubEvents.map((event) => (
+                <article key={event.id} className="feed-item">
+                  <div className="feed-item-content">
+                    <strong>{event.title}</strong>
+                    <p>{event.location}</p>
+                  </div>
+                  <div className="feed-item-actions">
+                    <span className="feed-item-date">{event.time ? `${event.date} · ${event.time}` : event.date}</span>
+                    <button type="button" className="ghost-button btn-sm" onClick={() => setEditingEvent({ id: event.id, title: event.title, date: event.date, time: event.time || '', location: event.location || '' })} disabled={clubsSaving}>Edit</button>
+                    <button type="button" className="danger-button btn-sm" onClick={() => deleteEventRecord(event.id)} disabled={clubsSaving}>Delete</button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Schedule new event" subtitle="Keep your club calendar active">
+            <form
+              className="stack-form"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (eventDraft.date < today) return;
+                const scheduled = await scheduleEventRecord(activeClub.id, eventDraft);
+                if (scheduled) setEventDraft(emptyEvent);
+              }}
+            >
+              <label>
+                Event title
+                <input
+                  value={eventDraft.title}
+                  onChange={(e) => setEventDraft((prev) => ({ ...prev, title: e.target.value }))}
+                  placeholder="e.g. Weekly meetup"
+                  required
+                />
+              </label>
+              <label>
+                Date
+                <input
+                  type="date"
+                  min={today}
+                  value={eventDraft.date}
+                  onChange={(e) => setEventDraft((prev) => ({ ...prev, date: e.target.value }))}
+                  required
+                />
+              </label>
+              <label>
+                Time
+                <input
+                  type="time"
+                  value={eventDraft.time}
+                  onChange={(e) => setEventDraft((prev) => ({ ...prev, time: e.target.value }))}
+                  required
+                />
+              </label>
+              <label>
+                Location
+                <input
+                  value={eventDraft.location}
+                  onChange={(e) => setEventDraft((prev) => ({ ...prev, location: e.target.value }))}
+                  placeholder="e.g. Room B204 or Online"
+                  required
+                />
+              </label>
+              <button type="submit" className="primary-button" disabled={clubsSaving}>
+                {clubsSaving ? 'Scheduling...' : 'Schedule event'}
+              </button>
+            </form>
+          </SectionCard>
+        </div>
+      )}
+
+      {/* My Proposals tab */}
+      {activeTab === 'my-proposals' && (
+        <SectionCard
+          title="My club proposals"
+          subtitle={`${myProposals.length} proposal${myProposals.length === 1 ? '' : 's'} submitted`}
+        >
+          <div className="action-list">
+            {myProposals.length === 0 ? (
+              <p className="empty-state">You have not submitted any proposals yet.</p>
+            ) : null}
+            {myProposals.map((req) => (
+              <article key={req.id} className="proposal-list-card">
+                <ProposalThumbnail imageKey={req.imageKey} />
+                <div className="proposal-list-copy">
+                  <div className="proposal-list-top">
+                    <strong>{req.name}</strong>
+                    <span className={req.status === 'Approved' ? 'status-approved' : req.status === 'Rejected' ? 'status-rejected' : 'status-pending'}>
+                      {req.status ?? 'Pending'}
+                    </span>
+                  </div>
+                  <p className="proposal-list-meta">{req.category}</p>
+                  {req.mission ? <p className="proposal-list-mission">{req.mission}</p> : null}
                 </div>
-                <select
-                  value={m.role}
-                  onChange={(e) => dispatch({ type: 'UPDATE_ROLE', payload: { clubId: selectedClub.id, memberId: m.id, role: e.target.value } })}
-                >
-                  <option>Club Leader</option>
-                  <option>Vice Leader</option>
-                  <option>Moderator</option>
-                  <option>Content Lead</option>
-                  <option>Member</option>
-                </select>
               </article>
             ))}
           </div>
-        </div>
+        </SectionCard>
       )}
 
-      {tab === 'new-club' && (
-        <div className="ops-content ops-narrow">
-          <p className="ops-section-label">Propose a new club</p>
-          <form className="stack-form" onSubmit={submitClub}>
-            <div className="input-grid">
-              <label>Club name<input value={clubDraft.name} onChange={(e) => setClub((d) => ({ ...d, name: e.target.value }))} required /></label>
-              <label>Category<input value={clubDraft.category} onChange={(e) => setClub((d) => ({ ...d, category: e.target.value }))} required /></label>
-              <label>Proposed by<input value={clubDraft.proposedBy} onChange={(e) => setClub((d) => ({ ...d, proposedBy: e.target.value }))} required /></label>
-            </div>
-            <label>Mission<textarea rows="4" value={clubDraft.mission} onChange={(e) => setClub((d) => ({ ...d, mission: e.target.value }))} required /></label>
-            <button type="submit" className="primary-button">Submit for admin review</button>
-          </form>
-        </div>
+      {/* My Join Requests tab */}
+      {activeTab === 'my-requests' && (
+        <SectionCard
+          title="My join requests"
+          subtitle={`${myJoinRequests.length} pending request${myJoinRequests.length === 1 ? '' : 's'}`}
+        >
+          <div className="action-list">
+            {myJoinRequests.length === 0 ? (
+              <p className="empty-state">No pending join requests.</p>
+            ) : null}
+            {myJoinRequests.map((req) => {
+              const club = clubs.find((c) => c.id === req.clubId);
+              return (
+                <article key={req.id} className="action-row">
+                  <div>
+                    <strong>{club?.name ?? req.clubId}</strong>
+                    <p>{club?.category ?? ''}</p>
+                  </div>
+                  <span className="status-pending">Pending review</span>
+                </article>
+              );
+            })}
+          </div>
+        </SectionCard>
       )}
+
+      {/* Propose Club tab */}
+      {activeTab === 'propose' && (
+        <SectionCard
+          title="Propose a new club"
+          subtitle="Start another student initiative at IUS"
+        >
+          <div className="info-callout">
+            <strong>You'll become the leader</strong>
+            <p>
+              Once an admin approves your proposal, you'll be automatically assigned as the
+              leader of the new club — right alongside this one.
+            </p>
+          </div>
+          <form
+            className="stack-form"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const saved = await submitClubProposalRecord({
+                ...clubDraft,
+                proposedBy: currentUser?.name ?? '',
+              });
+              if (saved) setClubDraft(emptyClubProposal);
+            }}
+          >
+            <label>
+              Club name
+              <input
+                value={clubDraft.name}
+                onChange={(e) => setClubDraft((prev) => ({ ...prev, name: e.target.value }))}
+                placeholder="e.g. Robotics Club"
+                required
+              />
+            </label>
+            <ClubCategoryField
+              value={clubDraft.category}
+              onChange={(category) => setClubDraft((prev) => ({ ...prev, category }))}
+            />
+            <label>
+              Mission
+              <textarea
+                rows="4"
+                value={clubDraft.mission}
+                onChange={(e) => setClubDraft((prev) => ({ ...prev, mission: e.target.value }))}
+                placeholder="What will this club do and who is it for?"
+                required
+              />
+            </label>
+            <ProposalImagePicker
+              value={clubDraft.imageKey}
+              onChange={(imageKey) => setClubDraft((prev) => ({ ...prev, imageKey }))}
+            />
+            <button type="submit" className="primary-button" disabled={clubsSaving}>
+              {clubsSaving ? 'Submitting...' : 'Submit for approval'}
+            </button>
+          </form>
+        </SectionCard>
+      )}
+
+      {editingAnnouncement ? (
+        <>
+          <div className="modal-backdrop" onClick={() => setEditingAnnouncement(null)} />
+          <div className="modal-card" role="dialog" aria-modal="true">
+            <div className="modal-card-header">
+              <h3 className="modal-title">Edit announcement</h3>
+              <button type="button" className="modal-close-button" onClick={() => setEditingAnnouncement(null)}>&times;</button>
+            </div>
+            <form className="stack-form" onSubmit={async (e) => {
+              e.preventDefault();
+              const ok = await updateAnnouncementRecord(editingAnnouncement.id, editingAnnouncement);
+              if (ok) setEditingAnnouncement(null);
+            }}>
+              <label>Title<input value={editingAnnouncement.title} onChange={(e) => setEditingAnnouncement((p) => ({ ...p, title: e.target.value }))} required /></label>
+              <label>Message<textarea rows="5" value={editingAnnouncement.body} onChange={(e) => setEditingAnnouncement((p) => ({ ...p, body: e.target.value }))} required /></label>
+              <div className="inline-actions form-actions">
+                <button type="submit" className="primary-button" disabled={clubsSaving}>{clubsSaving ? 'Saving...' : 'Save changes'}</button>
+                <button type="button" className="ghost-button" onClick={() => setEditingAnnouncement(null)}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </>
+      ) : null}
+
+      {editingEvent ? (
+        <>
+          <div className="modal-backdrop" onClick={() => setEditingEvent(null)} />
+          <div className="modal-card" role="dialog" aria-modal="true">
+            <div className="modal-card-header">
+              <h3 className="modal-title">Edit event</h3>
+              <button type="button" className="modal-close-button" onClick={() => setEditingEvent(null)}>&times;</button>
+            </div>
+            <form className="stack-form" onSubmit={async (e) => {
+              e.preventDefault();
+              const ok = await updateEventRecord(editingEvent.id, editingEvent);
+              if (ok) setEditingEvent(null);
+            }}>
+              <label>Title<input value={editingEvent.title} onChange={(e) => setEditingEvent((p) => ({ ...p, title: e.target.value }))} required /></label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <label>Date<input type="date" value={editingEvent.date} onChange={(e) => setEditingEvent((p) => ({ ...p, date: e.target.value }))} required /></label>
+                <label>Time<input type="time" value={editingEvent.time} onChange={(e) => setEditingEvent((p) => ({ ...p, time: e.target.value }))} required /></label>
+              </div>
+              <label>Location<input value={editingEvent.location} onChange={(e) => setEditingEvent((p) => ({ ...p, location: e.target.value }))} placeholder="Room or address" /></label>
+              <div className="inline-actions form-actions">
+                <button type="submit" className="primary-button" disabled={clubsSaving}>{clubsSaving ? 'Saving...' : 'Save changes'}</button>
+                <button type="button" className="ghost-button" onClick={() => setEditingEvent(null)}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }
 
-// ── Member ────────────────────────────────────────────────────────────────────
+// ── Member ─────────────────────────────────────────────────────────────────
+function MemberManage({ clubs, clubRequests, membershipRequests, currentUser }) {
+  const { submitClubProposalRecord } = useClubActions();
+  const { clubsSaving } = useAppState();
+  const [activeTab, setActiveTab] = useState('requests');
+  const [clubDraft, setClubDraft] = useState(emptyClubProposal);
 
-function MemberOps({ clubs, membershipRequests, currentUser }) {
-  const userName   = currentUser?.name;
-  const myClubs    = useMemo(() => clubs.filter((c) => c.members.some((m) => m.name === userName)), [clubs, userName]);
-  const myRequests = useMemo(() => membershipRequests.filter((r) => r.student === userName), [membershipRequests, userName]);
+  const myRequests = useMemo(
+    () => membershipRequests.filter(
+      (req) => req.email === currentUser?.email || req.student === currentUser?.name
+    ),
+    [membershipRequests, currentUser?.email, currentUser?.name]
+  );
+  const myProposals = useMemo(
+    () => (clubRequests ?? []).filter(
+      (req) => req.proposedByEmail === currentUser?.email || req.proposedBy === currentUser?.name
+    ),
+    [clubRequests, currentUser?.email, currentUser?.name]
+  );
 
-  const TABS = [
-    { id: 'clubs',    label: 'My Clubs',    count: 0 },
-    { id: 'requests', label: 'My Requests', count: myRequests.length },
+  const tabs = [
+    { id: 'requests', label: 'Join Requests', count: myRequests.length },
+    { id: 'proposals', label: 'My Proposals', count: myProposals.filter((p) => !p.status || p.status === 'Pending').length },
+    { id: 'start', label: 'Propose a Club' },
   ];
 
-  const [tab, setTab] = useState('clubs');
-
   return (
-    <div className="ops-layout">
-      <TabBar tabs={TABS} active={tab} onChange={setTab} />
+    <div className="page-stack">
+      {/* Stats — single row */}
+      <div className="dash-stats" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
+        <article className={`dash-stat ${myRequests.length > 0 ? 'dash-stat--urgent' : ''}`}>
+          <strong>{myRequests.length}</strong>
+          <span>Pending join requests</span>
+        </article>
+        <article className={`dash-stat ${myProposals.length > 0 ? 'dash-stat--urgent' : ''}`}>
+          <strong>{myProposals.length}</strong>
+          <span>Club proposals submitted</span>
+        </article>
+      </div>
 
-      {tab === 'clubs' && (
-        <div className="ops-content">
-          {myClubs.length === 0 ? (
-            <EmptySlate text="You're not in any clubs yet. Head to Club Directory to join one." />
-          ) : (
-            <div className="action-list">
-              {myClubs.map((club) => {
-                const role = club.members.find((m) => m.name === userName)?.role ?? 'Member';
-                return (
-                  <article key={club.id} className="action-row" style={{ '--card-accent': club.accent }}>
-                    <div>
-                      <strong>{club.name}</strong>
-                      <p>{club.category} · {club.members.length} members</p>
-                    </div>
-                    <span className="role-pill">{role}</span>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </div>
+      {/* Tab bar */}
+      <div className="tab-bar">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`.trim()}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.label}
+            {tab.count > 0 ? <span className="tab-badge">{tab.count}</span> : null}
+          </button>
+        ))}
+      </div>
+
+      {/* Requests tab */}
+      {activeTab === 'requests' && (
+        <SectionCard
+          title="Pending join requests"
+          subtitle={
+            myRequests.length === 0
+              ? 'No pending requests'
+              : `${myRequests.length} request${myRequests.length === 1 ? '' : 's'} awaiting club review`
+          }
+        >
+          <div className="action-list">
+            {myRequests.length === 0 ? (
+              <p className="empty-state">
+                You have no pending join requests. Head to Clubs → Discover to find and request a club.
+              </p>
+            ) : null}
+            {myRequests.map((req) => {
+              const club = clubs.find((c) => c.id === req.clubId);
+              return (
+                <article key={req.id} className="action-row">
+                  <div>
+                    <strong>{club?.name ?? req.clubId}</strong>
+                    <p>{club?.category ?? ''}</p>
+                  </div>
+                  <span className="status-pending">Pending review</span>
+                </article>
+              );
+            })}
+          </div>
+        </SectionCard>
       )}
 
-      {tab === 'requests' && (
-        <div className="ops-content">
-          {myRequests.length === 0 ? (
-            <EmptySlate text="No pending requests. Browse Club Directory to apply to clubs." />
-          ) : (
-            <div className="action-list">
-              {myRequests.map((req) => {
-                const club = clubs.find((c) => c.id === req.clubId);
-                return (
-                  <article key={req.id} className="action-row">
-                    <div>
-                      <strong>{club?.name ?? req.clubId}</strong>
-                      <p className="muted-text">Awaiting leadership review</p>
-                    </div>
-                    <span className="status-pending">Pending</span>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </div>
+      {/* Proposals tab */}
+      {activeTab === 'proposals' && (
+        <SectionCard
+          title="My club proposals"
+          subtitle={
+            myProposals.length === 0
+              ? 'No proposals submitted yet'
+              : `${myProposals.length} proposal${myProposals.length === 1 ? '' : 's'} waiting for admin approval`
+          }
+        >
+          <div className="action-list">
+            {myProposals.length === 0 ? (
+              <p className="empty-state">
+                You have not submitted any club proposals yet. Switch to Propose a Club to create one.
+              </p>
+            ) : null}
+            {myProposals.map((req) => (
+              <article key={req.id} className="proposal-list-card">
+                <ProposalThumbnail imageKey={req.imageKey} />
+                <div className="proposal-list-copy">
+                  <div className="proposal-list-top">
+                    <strong>{req.name}</strong>
+                    <span className={req.status === 'Approved' ? 'status-approved' : req.status === 'Rejected' ? 'status-rejected' : 'status-pending'}>
+                      {req.status ?? 'Pending'}
+                    </span>
+                  </div>
+                  <p className="proposal-list-meta">{req.category}</p>
+                  {req.mission ? <p className="proposal-list-mission">{req.mission}</p> : null}
+                </div>
+              </article>
+            ))}
+          </div>
+        </SectionCard>
+      )}
+
+      {/* Propose a Club tab */}
+      {activeTab === 'start' && (
+        <SectionCard
+          title="Start a new club"
+          subtitle="Submit a proposal — admin will review and approve it"
+        >
+          <div className="info-callout">
+            <strong>You'll be promoted to club leader</strong>
+            <p>
+              Once an admin approves your proposal, your account will be upgraded to Club Leader
+              for the new club — giving you full management access.
+            </p>
+          </div>
+          <form
+            className="stack-form"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const saved = await submitClubProposalRecord({
+                ...clubDraft,
+                proposedBy: currentUser?.name ?? '',
+              });
+              if (saved) {
+                setClubDraft(emptyClubProposal);
+                setActiveTab('proposals');
+              }
+            }}
+          >
+            <label>
+              Club name
+              <input
+                value={clubDraft.name}
+                onChange={(e) => setClubDraft((prev) => ({ ...prev, name: e.target.value }))}
+                placeholder="e.g. Chess Club"
+                required
+              />
+            </label>
+            <ClubCategoryField
+              value={clubDraft.category}
+              onChange={(category) => setClubDraft((prev) => ({ ...prev, category }))}
+            />
+            <label>
+              Mission
+              <textarea
+                rows="4"
+                value={clubDraft.mission}
+                onChange={(e) => setClubDraft((prev) => ({ ...prev, mission: e.target.value }))}
+                placeholder="What will this club do and who is it for?"
+                required
+              />
+            </label>
+            <ProposalImagePicker
+              value={clubDraft.imageKey}
+              onChange={(imageKey) => setClubDraft((prev) => ({ ...prev, imageKey }))}
+            />
+            <button type="submit" className="primary-button" disabled={clubsSaving}>
+              {clubsSaving ? 'Submitting...' : 'Submit for approval'}
+            </button>
+          </form>
+        </SectionCard>
       )}
     </div>
   );
 }
-
-// ── Export ────────────────────────────────────────────────────────────────────
 
 export const OperationsView = memo(function OperationsView(props) {
-  if (props.activeRole === 'Admin')       return <AdminOps  {...props} />;
-  if (props.activeRole === 'Club Leader') return <LeaderOps {...props} />;
-  return <MemberOps {...props} />;
+  if (props.activeRole === APP_ROLES.Admin) return <AdminRedirect />;
+  if (props.activeRole === APP_ROLES.ClubLeader) return <LeaderManage {...props} />;
+  return <MemberManage {...props} />;
 });

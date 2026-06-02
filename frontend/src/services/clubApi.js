@@ -137,6 +137,16 @@ export async function createEvent(auth, clubId, payload) {
   return parseResponse(response);
 }
 
+export async function leaveClub(auth, clubId) {
+  const response = await apiFetch(
+    auth.instance,
+    auth.account,
+    `${CLUBS_API_PATH}/${clubId}/members/me`,
+    { method: 'DELETE' }
+  );
+  return parseResponse(response);
+}
+
 export async function approveJoinRequest(auth, id) {
   const response = await apiFetch(auth.instance, auth.account, `${JOIN_REQUESTS_API_PATH}/${id}/approve`, {
     method: 'POST',

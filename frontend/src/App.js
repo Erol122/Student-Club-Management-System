@@ -10,6 +10,7 @@ import { Sidebar } from './components/layout/Sidebar';
 import { Topbar } from './components/layout/Topbar';
 import { LoginView } from './components/views/LoginView';
 import { navItems } from './data/navigation';
+import { APP_ROLES } from './domain/roles';
 
 const DashboardView = lazy(() => import('./components/views/DashboardView').then((m) => ({ default: m.DashboardView })));
 const ClubsView = lazy(() => import('./components/views/ClubsView').then((m) => ({ default: m.ClubsView })));
@@ -40,6 +41,11 @@ const AuthenticatedShell = memo(function AuthenticatedShell({ currentUser }) {
 
   const pendingCount = clubRequests.length + membershipRequests.length;
 
+  const visibleNavItems = useMemo(
+    () => activeRole === APP_ROLES.Admin ? navItems.filter((item) => item.id !== 'manage') : navItems,
+    [activeRole]
+  );
+
   useEffect(() => {
     reloadWorkspace();
   }, [currentUser.id, reloadWorkspace]);
@@ -48,7 +54,7 @@ const AuthenticatedShell = memo(function AuthenticatedShell({ currentUser }) {
     <div className="app-shell">
       <Sidebar
         activeView={activeView}
-        items={navItems}
+        items={visibleNavItems}
         pendingCount={pendingCount}
         currentUser={currentUser}
         onNavigate={(view) => dispatch({ type: 'NAVIGATE', payload: view })}
@@ -72,6 +78,7 @@ const AuthenticatedShell = memo(function AuthenticatedShell({ currentUser }) {
               events={events}
               activityLog={activityLog}
               selectedClub={selectedClub}
+              clubDetailTab={clubDetailTab}
             />
           )}
 
@@ -80,6 +87,7 @@ const AuthenticatedShell = memo(function AuthenticatedShell({ currentUser }) {
               activeRole={activeRole}
               currentUser={currentUser}
               clubs={clubs}
+              clubRequests={clubRequests}
               selectedClub={selectedClub}
               selectedClubId={selectedClub?.id ?? ''}
               clubDetailTab={clubDetailTab}
@@ -101,6 +109,7 @@ const AuthenticatedShell = memo(function AuthenticatedShell({ currentUser }) {
               selectedClub={selectedClub}
               announcements={announcements}
               events={events}
+              clubDetailTab={clubDetailTab}
             />
           )}
 

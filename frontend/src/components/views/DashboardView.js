@@ -1,7 +1,17 @@
-import { memo, useMemo } from 'react';
-import { useAppDispatch } from '../../context/AppContext';
+import { memo, useMemo, useState } from 'react';
+import { useAppDispatch, useAppState } from '../../context/AppContext';
+import { useClubActions } from '../../context/clubActions';
 import { APP_ROLES } from '../../domain/roles';
 import { SectionCard } from '../common/SectionCard';
+import { ClubDrawer } from '../common/ClubDrawer';
+
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function parseDateBadge(dateStr) {
+  if (!dateStr) return { day: '?', month: '???' };
+  const parts = dateStr.split('-');
+  if (parts.length < 3) return { day: dateStr, month: '' };
+  return { day: parseInt(parts[2], 10), month: MONTHS[parseInt(parts[1], 10) - 1] ?? parts[1] };
+}
 
 function timeAgo(ts) {
   const d = Date.now() - ts;
@@ -114,8 +124,18 @@ function AdminHome({ clubs, clubRequests, membershipRequests, events, activityLo
   );
 }
 
-function LeaderHome({ selectedClub, membershipRequests, announcements, events }) {
+function LeaderHome({ clubs, selectedClub, membershipRequests, announcements, events, currentUser }) {
   const dispatch = useAppDispatch();
+  const leaderClubs = useMemo(
+    () => (clubs ?? []).filter((club) =>
+      club.members.some((m) =>
+        (m.email === currentUser?.email || m.name === currentUser?.name) &&
+        m.role === 'President'
+      )
+    ),
+    [clubs, currentUser?.email, currentUser?.name]
+  );
+
   const today = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -143,6 +163,21 @@ function LeaderHome({ selectedClub, membershipRequests, announcements, events })
 
   return (
     <div className="page-stack">
+      {leaderClubs.length > 1 ? (
+        <div className="club-switcher">
+          <span className="club-switcher-label">Active club</span>
+          <select
+            className="club-switcher-select"
+            value={selectedClub.id}
+            onChange={(e) => dispatch({ type: 'SELECT_CLUB', payload: e.target.value })}
+          >
+            {leaderClubs.map((club) => (
+              <option key={club.id} value={club.id}>{club.name}</option>
+            ))}
+          </select>
+        </div>
+      ) : null}
+
       <section className="hero-panel" style={{ borderTop: `4px solid ${selectedClub.accent}` }}>
         <div className="hero-content">
           <span className="eyebrow">Club leader</span>
@@ -214,8 +249,11 @@ function LeaderHome({ selectedClub, membershipRequests, announcements, events })
   );
 }
 
-function MemberHome({ clubs, membershipRequests, announcements, events, currentUser }) {
+function MemberHome({ clubs, membershipRequests, announcements, events, currentUser, selectedClub, clubDetailTab }) {
   const dispatch = useAppDispatch();
+  const { clubsSaving } = useAppState();
+  const { leaveClubRecord } = useClubActions();
+  const [isDrawerOpen, setDrawerOpen] = useState(false);
   const userName = currentUser?.name;
 
   const myClubs = useMemo(
@@ -228,12 +266,18 @@ function MemberHome({ clubs, membershipRequests, announcements, events, currentU
     () => membershipRequests.filter((r) => r.student === userName),
     [membershipRequests, userName]
   );
+  const today = useMemo(() => { const d = new Date(); d.setHours(0,0,0,0); return d; }, []);
   const myEvents = useMemo(
-    () => events.filter((e) => myClubIds.includes(e.clubId)).slice(0, 5),
-    [events, myClubIds]
+    () => events
+      .filter((e) => myClubIds.includes(e.clubId) && new Date(e.date) >= today)
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
+      .slice(0, 5),
+    [events, myClubIds, today]
   );
   const myAnnouncements = useMemo(
-    () => announcements.filter((a) => myClubIds.includes(a.clubId)).slice(0, 5),
+    () => [...announcements.filter((a) => myClubIds.includes(a.clubId))]
+      .sort((a, b) => new Date(b.date) - new Date(a.date))
+      .slice(0, 5),
     [announcements, myClubIds]
   );
 
@@ -264,10 +308,33 @@ function MemberHome({ clubs, membershipRequests, announcements, events, currentU
         ]}
       />
 
+      {myEvents.length > 0 ? (
+        <SectionCard
+          title="Upcoming events"
+          subtitle={`${myEvents.length} event${myEvents.length === 1 ? '' : 's'} coming up across your clubs`}
+        >
+          {myEvents.map((event) => {
+            const { day, month } = parseDateBadge(event.date);
+            return (
+              <article key={event.id} className="event-card">
+                <div className="event-date-badge">
+                  <span className="event-date-day">{day}</span>
+                  <span className="event-date-month">{month}</span>
+                </div>
+                <div className="event-card-body">
+                  <strong>{event.title}</strong>
+                  <p>{event.location}</p>
+                </div>
+              </article>
+            );
+          })}
+        </SectionCard>
+      ) : null}
+
       <div className="dashboard-grid">
         <SectionCard
-          title="My club memberships"
-          subtitle="Open Clubs to discover and join more communities."
+          title="My clubs"
+          subtitle="Click a club to open details."
           actions={
             <button
               type="button"
@@ -282,30 +349,64 @@ function MemberHome({ clubs, membershipRequests, announcements, events, currentU
             {myClubs.length === 0 ? <p className="empty-state">You have not joined any clubs yet.</p> : null}
             {myClubs.map((club) => (
               <article key={club.id} className="action-row">
-                <div>
+                <button
+                  type="button"
+                  style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', flex: 1 }}
+                  onClick={() => {
+                    dispatch({ type: 'SELECT_CLUB', payload: club.id });
+                    setDrawerOpen(true);
+                  }}
+                >
                   <strong>{club.name}</strong>
                   <p>{club.category}</p>
-                </div>
+                </button>
               </article>
             ))}
           </div>
         </SectionCard>
 
         <SectionCard title="Latest announcements" subtitle="Recent updates from your clubs.">
-          <div className="feed-list">
-            {myAnnouncements.length === 0 ? <p className="empty-state">No updates from your clubs yet.</p> : null}
-            {myAnnouncements.map((item) => (
-              <article key={item.id} className="feed-item">
-                <div>
+          {myAnnouncements.length === 0 ? (
+            <p className="empty-state">No updates from your clubs yet.</p>
+          ) : null}
+          {myAnnouncements.map((item) => {
+            const club = clubs.find((c) => c.id === item.clubId);
+            return (
+              <article key={item.id} className="announcement-card">
+                <div className="announcement-card-header">
                   <strong>{item.title}</strong>
-                  <p>{item.author}</p>
+                  <span>{item.date}</span>
                 </div>
-                <span>{item.date}</span>
+                {item.body ? <p className="announcement-card-body">{item.body}</p> : null}
+                <div className="announcement-card-footer">
+                  {club ? (
+                    <span className="directory-category" style={{ fontSize: '0.72rem', padding: '3px 8px' }}>
+                      {club.name}
+                    </span>
+                  ) : null}
+                  {item.author ? <span className="announcement-card-author">— {item.author}</span> : null}
+                </div>
               </article>
-            ))}
-          </div>
+            );
+          })}
         </SectionCard>
       </div>
+
+      {isDrawerOpen ? (
+        <ClubDrawer
+          key={selectedClub?.id}
+          selectedClub={selectedClub}
+          clubDetailTab={clubDetailTab}
+          announcements={announcements}
+          events={events}
+          onClose={() => setDrawerOpen(false)}
+          onLeave={async (clubId) => {
+            const left = await leaveClubRecord(clubId);
+            if (left) setDrawerOpen(false);
+          }}
+          isSaving={clubsSaving}
+        />
+      ) : null}
     </div>
   );
 }

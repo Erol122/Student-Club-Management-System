@@ -6,6 +6,7 @@ import iusLogo from '../../data/IUS_Official_Logo.png';
 function NavButton({ item, activeView, pendingCount, onNavigate, compact = false }) {
   const isActive = activeView === item.id;
   const showBadge = item.showBadge && pendingCount > 0;
+  const Icon = item.icon ?? null;
 
   return (
     <button
@@ -13,7 +14,9 @@ function NavButton({ item, activeView, pendingCount, onNavigate, compact = false
       className={`nav-link ${isActive ? 'active' : ''} ${compact ? 'compact' : ''}`.trim()}
       onClick={() => onNavigate(item.id)}
     >
-      <span className="nav-link-short">{item.short}</span>
+      <span className="nav-link-short">
+        {Icon ? <Icon /> : null}
+      </span>
       <span className="nav-link-label">{item.label}</span>
       {showBadge ? <span className="nav-badge">{pendingCount}</span> : null}
     </button>

@@ -110,6 +110,19 @@ public sealed class ClubWorkflowRepository(AppDbContext dbContext) : IClubWorkfl
             .AnyAsync(club => club.Slug == slug, cancellationToken);
     }
 
+    public async Task<ClubMembership?> GetApprovedMembershipAsync(
+        Guid clubId,
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        return await dbContext.ClubMemberships
+            .SingleOrDefaultAsync(
+                m => m.ClubId == clubId &&
+                     m.UserId == userId &&
+                     m.Status == ClubMembershipStatus.Approved,
+                cancellationToken);
+    }
+
     public async Task<bool> UserHasApprovedMembershipAsync(
         Guid clubId,
         Guid userId,

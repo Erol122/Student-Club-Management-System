@@ -83,6 +83,7 @@ export function reducer(state, action) {
         ...state,
         clubs,
         clubsLoading: false,
+        clubsSaving: false,
         clubsError: null,
         selectedClubId: syncSelectedClubId(state.selectedClubId, clubs),
       };

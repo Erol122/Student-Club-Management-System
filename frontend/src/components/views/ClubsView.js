@@ -8,6 +8,39 @@ import { ClubThumbnail } from '../common/ClubMedia';
 import { SectionCard } from '../common/SectionCard';
 import { ClubDrawer } from '../common/ClubDrawer';
 
+function FilterBar({ searchQuery, categoryFilter, categories, sortBy, onSearch, onCategory, onSort }) {
+  return (
+    <div className="filter-sort-bar">
+      <input
+        className="search-input"
+        placeholder="Search clubs..."
+        value={searchQuery}
+        onChange={(e) => onSearch(e.target.value)}
+      />
+      <select
+        className="filter-select"
+        value={categoryFilter}
+        onChange={(e) => onCategory(e.target.value)}
+        aria-label="Filter by category"
+      >
+        {categories.map((cat) => (
+          <option key={cat} value={cat}>{cat === 'All' ? 'All categories' : cat}</option>
+        ))}
+      </select>
+      <select
+        className="filter-select"
+        value={sortBy}
+        onChange={(e) => onSort(e.target.value)}
+        aria-label="Sort clubs"
+      >
+        <option value="name">Name A–Z</option>
+        <option value="members">Most members</option>
+        <option value="created">Recently created</option>
+      </select>
+    </div>
+  );
+}
+
 const formatSubmittedDate = (value) => {
   if (!value) return 'Not recorded';
   const date = new Date(value);
@@ -50,6 +83,7 @@ export const ClubsView = memo(function ClubsView({
   const [memberView, setMemberView] = useState('my-clubs');
   const [isDrawerOpen, setDrawerOpen] = useState(false);
   const [selectedProposal, setSelectedProposal] = useState(null);
+  const [sortBy, setSortBy] = useState('name');
   const categories = useMemo(() => {
     const customCategories = clubs
       .map((club) => club.category)
@@ -72,8 +106,12 @@ export const ClubsView = memo(function ClubsView({
     if (categoryFilter !== 'All') {
       result = result.filter((club) => club.category === categoryFilter);
     }
-    return result;
-  }, [categoryFilter, searchQuery]);
+    return [...result].sort((a, b) => {
+      if (sortBy === 'members') return b.members.length - a.members.length;
+      if (sortBy === 'created') return new Date(b.createdAt) - new Date(a.createdAt);
+      return a.name.localeCompare(b.name);
+    });
+  }, [categoryFilter, searchQuery, sortBy]);
 
   const filteredClubs = useMemo(
     () => filterClubs(clubs),
@@ -191,27 +229,15 @@ export const ClubsView = memo(function ClubsView({
           </SectionCard>
         ) : null}
 
-        <section className="search-row">
-          <input
-            className="search-input"
-            placeholder="Search clubs by name, category, or leader..."
-            value={searchQuery}
-            onChange={(e) => dispatch({ type: 'SET_SEARCH', payload: e.target.value })}
-          />
-        </section>
-
-        <div className="filter-chips">
-          {categories.map((category) => (
-            <button
-              key={category}
-              type="button"
-              className={`filter-chip ${categoryFilter === category ? 'active' : ''}`.trim()}
-              onClick={() => dispatch({ type: 'SET_CATEGORY', payload: category })}
-            >
-              {category}
-            </button>
-          ))}
-        </div>
+        <FilterBar
+          searchQuery={searchQuery}
+          categoryFilter={categoryFilter}
+          categories={categories}
+          sortBy={sortBy}
+          onSearch={(v) => dispatch({ type: 'SET_SEARCH', payload: v })}
+          onCategory={(v) => dispatch({ type: 'SET_CATEGORY', payload: v })}
+          onSort={setSortBy}
+        />
 
         <SectionCard
           className="club-list-card"
@@ -322,27 +348,15 @@ export const ClubsView = memo(function ClubsView({
           </SectionCard>
         ) : (
           <>
-            <section className="search-row">
-              <input
-                className="search-input"
-                placeholder="Search clubs by name, category, or leader..."
-                value={searchQuery}
-                onChange={(e) => dispatch({ type: 'SET_SEARCH', payload: e.target.value })}
-              />
-            </section>
-
-            <div className="filter-chips">
-              {categories.map((category) => (
-                <button
-                  key={category}
-                  type="button"
-                  className={`filter-chip ${categoryFilter === category ? 'active' : ''}`.trim()}
-                  onClick={() => dispatch({ type: 'SET_CATEGORY', payload: category })}
-                >
-                  {category}
-                </button>
-              ))}
-            </div>
+            <FilterBar
+              searchQuery={searchQuery}
+              categoryFilter={categoryFilter}
+              categories={categories}
+              sortBy={sortBy}
+              onSearch={(v) => dispatch({ type: 'SET_SEARCH', payload: v })}
+              onCategory={(v) => dispatch({ type: 'SET_CATEGORY', payload: v })}
+              onSort={setSortBy}
+            />
 
             <SectionCard
               title="Join clubs"
@@ -405,72 +419,102 @@ export const ClubsView = memo(function ClubsView({
     );
   }
 
-  // ── Club Leader ────────────────────────────────────────────────────────────
+  // ── Club Leader — same browse/join experience as members ──────────────────
+  const showMyClubsLeader = memberView === 'my-clubs';
   return (
     <div className="page-stack">
-      <section className="search-row">
-        <input
-          className="search-input"
-          placeholder="Search clubs by name, category, or leader..."
-          value={searchQuery}
-          onChange={(e) => dispatch({ type: 'SET_SEARCH', payload: e.target.value })}
-        />
-      </section>
-
-      <div className="filter-chips">
-        {categories.map((category) => (
-          <button
-            key={category}
-            type="button"
-            className={`filter-chip ${categoryFilter === category ? 'active' : ''}`.trim()}
-            onClick={() => dispatch({ type: 'SET_CATEGORY', payload: category })}
-          >
-            {category}
-          </button>
-        ))}
+      <div className="club-view-tabs">
+        <button
+          type="button"
+          className={`tab-btn ${showMyClubsLeader ? 'active' : ''}`.trim()}
+          onClick={() => setMemberView('my-clubs')}
+        >
+          My clubs
+        </button>
+        <button
+          type="button"
+          className={`tab-btn ${!showMyClubsLeader ? 'active' : ''}`.trim()}
+          onClick={() => setMemberView('join-clubs')}
+        >
+          Join clubs
+        </button>
       </div>
 
-      <SectionCard
-        className="club-list-card"
-        title="Club directory"
-        subtitle={`${filteredClubs.length} club${filteredClubs.length === 1 ? '' : 's'} shown`}
-      >
-        <div className="club-list">
-          {filteredClubs.length === 0 ? <p className="empty-state">No clubs match the current filters.</p> : null}
-          {filteredClubs.map((club) => (
-            <button
-              key={club.id}
-              type="button"
-              className={`club-list-row ${isDrawerOpen && selectedClubId === club.id ? 'selected' : ''}`.trim()}
-              onClick={() => openDrawer(club.id)}
-            >
-              <ClubThumbnail imageKey={club.imageKey} name={club.name} />
-              <span className="club-list-main">
-                <strong>{club.name}</strong>
-                <span>{club.summary}</span>
-              </span>
-              <span className="club-list-meta">
-                <span>{club.category}</span>
-                <span>{club.leader}</span>
-              </span>
-            </button>
-          ))}
-        </div>
-      </SectionCard>
+      {showMyClubsLeader ? (
+        <SectionCard
+          title="My clubs"
+          subtitle={`${memberClubs.length} club${memberClubs.length === 1 ? '' : 's'} you belong to`}
+        >
+          <div className="directory-grid">
+            {memberClubs.length === 0 ? (
+              <p className="empty-state">You are not a member of any clubs yet.</p>
+            ) : null}
+            {memberClubs.map((club) => (
+              <article key={club.id} className="directory-card">
+                <ClubThumbnail imageKey={club.imageKey} name={club.name} className="directory-card-image" />
+                <div className="directory-card-top">
+                  <span className="directory-category">{club.category}</span>
+                </div>
+                <h4>{club.name}</h4>
+                <p>{club.summary}</p>
+                <div className="directory-card-meta">
+                  <span>{club.leader}</span>
+                  <span>{club.members.length} members</span>
+                </div>
+              </article>
+            ))}
+          </div>
+        </SectionCard>
+      ) : (
+        <>
+          <FilterBar
+            searchQuery={searchQuery}
+            categoryFilter={categoryFilter}
+            categories={categories}
+            sortBy={sortBy}
+            onSearch={(v) => dispatch({ type: 'SET_SEARCH', payload: v })}
+            onCategory={(v) => dispatch({ type: 'SET_CATEGORY', payload: v })}
+            onSort={setSortBy}
+          />
+          <SectionCard
+            title="Join clubs"
+            subtitle={`${joinableClubs.length} club${joinableClubs.length === 1 ? '' : 's'} available`}
+          >
+            <div className="directory-grid member-join-grid">
+              {joinableClubs.length === 0 ? <p className="empty-state">No clubs available to join right now.</p> : null}
+              {joinableClubs.map((club) => {
+                const isPending = pendingClubIds.includes(club.id);
+                const isSelected = isDrawerOpen && selectedClubId === club.id;
+                return (
+                  <article
+                    key={club.id}
+                    className={`directory-card ${isSelected ? 'selected' : ''}`.trim()}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => openDrawer(club.id)}
+                  >
+                    <ClubThumbnail imageKey={club.imageKey} name={club.name} className="directory-card-image" />
+                    <div className="directory-card-top">
+                      <span className="directory-category">{club.category}</span>
+                    </div>
+                    <h4>{club.name}</h4>
+                    <p>{club.summary}</p>
+                    <div className="directory-card-meta"><span>{club.leader}</span></div>
+                    <button
+                      type="button"
+                      className={`primary-button ${isPending ? 'is-muted' : ''}`.trim()}
+                      disabled={isPending}
+                      onClick={(e) => { e.stopPropagation(); requestMembershipRecord(club.id); }}
+                    >
+                      {isPending ? 'Request pending' : 'Request to join'}
+                    </button>
+                  </article>
+                );
+              })}
+            </div>
+          </SectionCard>
+        </>
+      )}
 
-      {isDrawerOpen ? (
-        <ClubDrawer
-          key={selectedClub?.id}
-          selectedClub={selectedClub}
-          clubDetailTab={clubDetailTab}
-          announcements={announcements}
-          events={events}
-          onClose={closeDrawer}
-          onSave={handleSaveClub}
-          editMode="whatsapp"
-          isSaving={clubsSaving}
-        />
-      ) : null}
     </div>
   );
 });

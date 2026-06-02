@@ -17,6 +17,7 @@ const ClubsView = lazy(() => import('./components/views/ClubsView').then((m) => 
 const OperationsView = lazy(() => import('./components/views/OperationsView').then((m) => ({ default: m.OperationsView })));
 
 const AuthenticatedShell = memo(function AuthenticatedShell({ currentUser }) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const dispatch = useAppDispatch();
   const { reloadWorkspace } = useClubActions();
   const {
@@ -58,12 +59,26 @@ const AuthenticatedShell = memo(function AuthenticatedShell({ currentUser }) {
         pendingCount={pendingCount}
         currentUser={currentUser}
         onNavigate={(view) => dispatch({ type: 'NAVIGATE', payload: view })}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
       />
 
+      <button
+        className={`sidebar-edge-btn${sidebarOpen ? ' open' : ''}`}
+        onClick={() => setSidebarOpen((o) => !o)}
+        aria-label={sidebarOpen ? 'Close navigation' : 'Open navigation'}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          {sidebarOpen ? (
+            <polyline points="15 18 9 12 15 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+          ) : (
+            <polyline points="9 18 15 12 9 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+          )}
+        </svg>
+      </button>
+
       <main className="platform-main">
-        <Topbar
-          activeView={activeView}
-        />
+        <Topbar activeView={activeView} />
 
         <Suspense fallback={<div className="view-loading">Loading workspace...</div>}>
           {activeView === 'home' && (

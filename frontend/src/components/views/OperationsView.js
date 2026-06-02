@@ -4,6 +4,8 @@ import { useClubActions } from '../../context/clubActions';
 import { APP_ROLES, CLUB_MEMBER_ROLES } from '../../domain/roles';
 import { clubProposalImages, clubProposalImageByKey } from '../../data/clubProposalImages';
 import { ClubCategoryField } from '../common/ClubCategoryField';
+import { ClubDrawer } from '../common/ClubDrawer';
+import { ClubThumbnail } from '../common/ClubMedia';
 import { SectionCard } from '../common/SectionCard';
 
 const emptyAnnouncement = { title: '', body: '' };
@@ -55,7 +57,7 @@ function AdminRedirect() {
 }
 
 // ── Club Leader ────────────────────────────────────────────────────────────
-function LeaderManage({ clubs, selectedClub, membershipRequests, announcements, events, currentUser }) {
+function LeaderManage({ clubs, selectedClub, membershipRequests, announcements, events, clubDetailTab, currentUser }) {
   const dispatch = useAppDispatch();
   const {
     approveMembershipRecord,
@@ -63,10 +65,13 @@ function LeaderManage({ clubs, selectedClub, membershipRequests, announcements, 
     rejectMembershipRecord,
     scheduleEventRecord,
     submitClubProposalRecord,
+    updateClubRecord,
   } = useClubActions();
   const { clubsSaving } = useAppState();
 
   const [activeTab, setActiveTab] = useState('requests');
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerClubId, setDrawerClubId] = useState(null);
 
   const leaderClubs = useMemo(
     () => clubs.filter((club) =>
@@ -108,6 +113,11 @@ function LeaderManage({ clubs, selectedClub, membershipRequests, announcements, 
     [events, activeClubId, today]
   );
 
+  const drawerClub = useMemo(
+    () => leaderClubs.find((c) => c.id === drawerClubId) ?? null,
+    [leaderClubs, drawerClubId]
+  );
+
   if (!activeClub) {
     return <p className="empty-state">No club is available to manage yet.</p>;
   }
@@ -121,6 +131,46 @@ function LeaderManage({ clubs, selectedClub, membershipRequests, announcements, 
 
   return (
     <div className="page-stack">
+      {/* Club directory — click to manage */}
+      <SectionCard
+        title="My clubs"
+        subtitle={`${leaderClubs.length} club${leaderClubs.length === 1 ? '' : 's'} you manage — click to open`}
+      >
+        <div className="club-list">
+          {leaderClubs.map((club) => (
+            <button
+              key={club.id}
+              type="button"
+              className={`club-list-row ${drawerOpen && drawerClubId === club.id ? 'selected' : ''}`.trim()}
+              onClick={() => { setDrawerClubId(club.id); setDrawerOpen(true); }}
+            >
+              <ClubThumbnail imageKey={club.imageKey} name={club.name} />
+              <span className="club-list-main">
+                <strong>{club.name}</strong>
+                <span>{club.summary}</span>
+              </span>
+              <span className="club-list-meta">
+                <span>{club.category}</span>
+                <span>{club.members.length} members</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </SectionCard>
+
+      {drawerOpen && drawerClub ? (
+        <ClubDrawer
+          key={drawerClub.id}
+          selectedClub={drawerClub}
+          clubDetailTab={clubDetailTab}
+          announcements={announcements}
+          events={events}
+          onClose={() => setDrawerOpen(false)}
+          onSave={(draft) => updateClubRecord(drawerClub.id, draft)}
+          isSaving={clubsSaving}
+        />
+      ) : null}
+
       {/* Club header */}
       <section className="manage-club-header">
         {leaderClubs.length > 1 ? (

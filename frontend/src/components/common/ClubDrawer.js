@@ -234,7 +234,7 @@ export function ClubDrawer({
     if (saved) setIsEditing(false);
   };
 
-  const canEditLink = editMode === 'whatsapp' || Boolean(onDelete);
+  const canEditLink = editMode === 'whatsapp' || Boolean(onDelete) || Boolean(onSave);
   const showLinkSection = Boolean(onLeave || canEditLink) && Boolean(selectedClub.groupLink || canEditLink);
 
   function platformLabel(link, stored) {
@@ -311,6 +311,16 @@ export function ClubDrawer({
                   {canEditLink ? (
                     <button type="button" className="ghost-button" onClick={() => setIsEditing(true)} disabled={isSaving}>
                       {selectedClub.groupLink ? 'Edit link' : 'Add link'}
+                    </button>
+                  ) : null}
+                  {canEditLink && selectedClub.groupLink ? (
+                    <button
+                      type="button"
+                      className="danger-button"
+                      disabled={isSaving}
+                      onClick={() => onSave({ ...selectedClub, groupLink: '' })}
+                    >
+                      Remove
                     </button>
                   ) : null}
                 </div>

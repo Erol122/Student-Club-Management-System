@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useAppDispatch } from '../../context/AppContext';
+import { CLUB_MEMBER_ROLES } from '../../domain/roles';
+import { ClubCategoryField } from './ClubCategoryField';
 import { ConfirmModal } from './ConfirmModal';
 
 const TABS = [
@@ -37,7 +39,7 @@ function EventsList({ events }) {
             </div>
             <div className="event-card-body">
               <strong>{event.title}</strong>
-              <p>{event.location}</p>
+              <p>{event.location}{event.time ? ` · ${event.time}` : ''}</p>
             </div>
           </article>
         );
@@ -72,6 +74,14 @@ function AnnouncementsList({ announcements, clubName }) {
 function ClubDetailBody({ selectedClub, clubDetailTab, announcements, events }) {
   const dispatch = useAppDispatch();
   const selectedClubId = selectedClub?.id ?? null;
+  const orderedMembers = useMemo(
+    () => [...selectedClub.members].sort((a, b) => {
+      if (a.role === CLUB_MEMBER_ROLES.President && b.role !== CLUB_MEMBER_ROLES.President) return -1;
+      if (a.role !== CLUB_MEMBER_ROLES.President && b.role === CLUB_MEMBER_ROLES.President) return 1;
+      return a.name.localeCompare(b.name);
+    }),
+    [selectedClub.members]
+  );
 
   const clubAnnouncements = useMemo(
     () => [...announcements.filter((a) => a.clubId === selectedClubId)]
@@ -81,7 +91,7 @@ function ClubDetailBody({ selectedClub, clubDetailTab, announcements, events }) 
   const clubEvents = useMemo(
     () => events
       .filter((e) => e.clubId === selectedClubId)
-      .sort((a, b) => new Date(a.date) - new Date(b.date)),
+      .sort((a, b) => new Date(a.startAt) - new Date(b.startAt)),
     [events, selectedClubId]
   );
 
@@ -120,18 +130,22 @@ function ClubDetailBody({ selectedClub, clubDetailTab, announcements, events }) 
           {selectedClub.members.length === 0 ? (
             <p className="empty-state">No members yet.</p>
           ) : null}
-          {selectedClub.members.map((member) => (
-            <article key={member.id} className="member-row">
-              <div className="member-avatar">
-                {member.name.split(' ').map((p) => p[0]).join('').slice(0, 2)}
-              </div>
-              <div>
-                <strong>{member.name}</strong>
-                <p>{member.program}</p>
-              </div>
-              <span className="role-pill">{member.role}</span>
-            </article>
-          ))}
+          {orderedMembers.map((member) => {
+            const isPresident = member.role === CLUB_MEMBER_ROLES.President;
+
+            return (
+              <article key={member.id} className={`member-row ${isPresident ? 'member-row-president' : ''}`.trim()}>
+                <div className="member-avatar">
+                  {member.name.split(' ').map((p) => p[0]).join('').slice(0, 2)}
+                </div>
+                <div>
+                  <strong>{member.name}</strong>
+                  <p>{isPresident ? 'President' : member.program}</p>
+                </div>
+                <span className="role-pill">{member.role}</span>
+              </article>
+            );
+          })}
         </div>
       )}
 
@@ -144,15 +158,15 @@ function ClubDetailBody({ selectedClub, clubDetailTab, announcements, events }) 
   );
 }
 
-function EditForm({ club, onSave, onCancel, isSaving }) {
+function EditForm({ club, onSave, onCancel, isSaving, mode = 'details' }) {
   const [draft, setDraft] = useState({
     name: club.name,
     category: club.category,
     summary: club.summary,
     health: club.health,
-    groupPlatform: club.groupPlatform || 'WhatsApp',
     groupLink: club.groupLink || '',
   });
+  const isWhatsAppOnly = mode === 'whatsapp';
 
   return (
     <form
@@ -163,26 +177,34 @@ function EditForm({ club, onSave, onCancel, isSaving }) {
         onSave(draft);
       }}
     >
-      <label>
-        Club name
-        <input value={draft.name} onChange={(e) => setDraft((p) => ({ ...p, name: e.target.value }))} maxLength="150" required />
-      </label>
-      <label>
-        Category
-        <input value={draft.category} onChange={(e) => setDraft((p) => ({ ...p, category: e.target.value }))} required />
-      </label>
-      <label>
-        Summary
-        <textarea rows="3" value={draft.summary} onChange={(e) => setDraft((p) => ({ ...p, summary: e.target.value }))} required />
-      </label>
-      <label>
-        Group platform
-        <input value={draft.groupPlatform} onChange={(e) => setDraft((p) => ({ ...p, groupPlatform: e.target.value }))} />
-      </label>
-      <label>
-        Group link
-        <input value={draft.groupLink} onChange={(e) => setDraft((p) => ({ ...p, groupLink: e.target.value }))} placeholder="https://..." />
-      </label>
+      {!isWhatsAppOnly ? (
+        <>
+          <label>
+            Club name
+            <input value={draft.name} onChange={(e) => setDraft((p) => ({ ...p, name: e.target.value }))} maxLength="150" required />
+          </label>
+          <ClubCategoryField
+            value={draft.category}
+            onChange={(category) => setDraft((p) => ({ ...p, category }))}
+          />
+          <label>
+            Summary
+            <textarea rows="3" value={draft.summary} onChange={(e) => setDraft((p) => ({ ...p, summary: e.target.value }))} required />
+          </label>
+        </>
+      ) : null}
+      {isWhatsAppOnly ? (
+        <label>
+          WhatsApp group link
+          <input
+            type="url"
+            value={draft.groupLink}
+            onChange={(e) => setDraft((p) => ({ ...p, groupLink: e.target.value }))}
+            placeholder="https://chat.whatsapp.com/..."
+            maxLength="500"
+          />
+        </label>
+      ) : null}
       <div className="inline-actions form-actions">
         <button type="submit" className="primary-button" disabled={isSaving}>{isSaving ? 'Saving...' : 'Save changes'}</button>
         <button type="button" className="ghost-button" onClick={onCancel} disabled={isSaving}>Cancel</button>
@@ -201,6 +223,7 @@ export function ClubDrawer({
   onSave,
   onLeave,
   isSaving,
+  editMode = 'details',
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -212,6 +235,8 @@ export function ClubDrawer({
     const saved = await onSave(draft);
     if (saved) setIsEditing(false);
   };
+  const canUseWhatsApp = Boolean(onLeave || editMode === 'whatsapp');
+  const showWhatsAppActions = canUseWhatsApp && Boolean(selectedClub.groupLink || editMode === 'whatsapp');
 
   return (
     <>
@@ -230,7 +255,7 @@ export function ClubDrawer({
                 Leave
               </button>
             ) : null}
-            {onSave && !isEditing ? (
+            {onSave && editMode !== 'whatsapp' && !isEditing ? (
               <button type="button" className="ghost-button" onClick={() => setIsEditing(true)} disabled={isSaving}>
                 Edit
               </button>
@@ -248,24 +273,48 @@ export function ClubDrawer({
 
         {!isEditing ? (
           <>
-            <div className="club-drawer-actions">
-              {selectedClub.groupLink ? (
-                <a className="ghost-button link-button" href={selectedClub.groupLink} target="_blank" rel="noreferrer">
-                  Join {selectedClub.groupPlatform || 'Group'}
-                </a>
-              ) : (
-                <span className="group-link-muted">No group link yet</span>
-              )}
-            </div>
             <ClubDetailBody
               selectedClub={selectedClub}
               clubDetailTab={clubDetailTab}
               announcements={announcements}
               events={events}
             />
+            {showWhatsAppActions ? (
+              <section className="whatsapp-card" aria-label="WhatsApp group">
+                <div className="whatsapp-card-copy">
+                  <strong>WhatsApp group</strong>
+                  <p>
+                    {selectedClub.groupLink
+                      ? 'Members can use this invite to join the club chat.'
+                      : 'Add the invite link once the club chat is ready.'}
+                  </p>
+                  {selectedClub.groupLink ? (
+                    <span className="whatsapp-link-preview">{selectedClub.groupLink}</span>
+                  ) : null}
+                </div>
+                <div className="whatsapp-card-actions">
+                  {selectedClub.groupLink ? (
+                    <a className="primary-button link-button" href={selectedClub.groupLink} target="_blank" rel="noreferrer">
+                      Open WhatsApp group
+                    </a>
+                  ) : null}
+                  {editMode === 'whatsapp' ? (
+                    <button type="button" className="ghost-button" onClick={() => setIsEditing(true)} disabled={isSaving}>
+                      {selectedClub.groupLink ? 'Edit link' : 'Add link'}
+                    </button>
+                  ) : null}
+                </div>
+              </section>
+            ) : null}
           </>
         ) : (
-          <EditForm club={selectedClub} onSave={handleSave} onCancel={() => setIsEditing(false)} isSaving={isSaving} />
+          <EditForm
+            club={selectedClub}
+            onSave={handleSave}
+            onCancel={() => setIsEditing(false)}
+            isSaving={isSaving}
+            mode={editMode}
+          />
         )}
       </aside>
 

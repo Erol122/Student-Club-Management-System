@@ -2,12 +2,54 @@ import { memo, useEffect, useMemo, useState } from 'react';
 import { useAppState, useAppDispatch } from '../../context/AppContext';
 import { useClubActions } from '../../context/clubActions';
 import { APP_ROLES, CLUB_MEMBER_ROLES } from '../../domain/roles';
+import { clubProposalImages, clubProposalImageByKey } from '../../data/clubProposalImages';
+import { ClubCategoryField } from '../common/ClubCategoryField';
 import { SectionCard } from '../common/SectionCard';
-import { ClubDrawer } from '../common/ClubDrawer';
 
 const emptyAnnouncement = { title: '', body: '' };
-const emptyEvent = { title: '', date: '', location: '' };
-const emptyClubProposal = { name: '', category: '', mission: '' };
+const emptyEvent = { title: '', date: '', time: '', location: '' };
+const emptyClubProposal = { name: '', category: '', mission: '', imageKey: '' };
+
+function ProposalImagePicker({ value, onChange }) {
+  return (
+    <fieldset className="proposal-image-picker">
+      <legend>Image</legend>
+      <div className="proposal-image-options">
+        <button
+          type="button"
+          className={`proposal-image-option proposal-image-none ${!value ? 'selected' : ''}`.trim()}
+          onClick={() => onChange('')}
+        >
+          No image
+        </button>
+        {clubProposalImages.map((image) => (
+          <button
+            key={image.key}
+            type="button"
+            className={`proposal-image-option ${value === image.key ? 'selected' : ''}`.trim()}
+            onClick={() => onChange(image.key)}
+          >
+            <img src={image.src} alt="" />
+            <span>{image.label}</span>
+          </button>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+function ProposalThumbnail({ imageKey }) {
+  const image = clubProposalImageByKey.get(imageKey);
+  if (!image) return null;
+
+  return (
+    <img
+      className="proposal-list-image"
+      src={image.src}
+      alt=""
+    />
+  );
+}
 
 // ── Admin: redirect to Clubs (everything is managed there) ─────────────────
 function AdminRedirect() {
@@ -67,8 +109,8 @@ function LeaderManage({ clubs, selectedClub, membershipRequests, announcements, 
   );
   const clubEvents = useMemo(
     () => events
-      .filter((e) => e.clubId === activeClubId && new Date(e.date) >= new Date(today))
-      .sort((a, b) => new Date(a.date) - new Date(b.date)),
+      .filter((e) => e.clubId === activeClubId && new Date(e.startAt) >= new Date(today))
+      .sort((a, b) => new Date(a.startAt) - new Date(b.startAt)),
     [events, activeClubId, today]
   );
 
@@ -260,7 +302,7 @@ function LeaderManage({ clubs, selectedClub, membershipRequests, announcements, 
                     <strong>{event.title}</strong>
                     <p>{event.location}</p>
                   </div>
-                  <span>{event.date}</span>
+                  <span>{event.time ? `${event.date} · ${event.time}` : event.date}</span>
                 </article>
               ))}
             </div>
@@ -292,6 +334,15 @@ function LeaderManage({ clubs, selectedClub, membershipRequests, announcements, 
                   min={today}
                   value={eventDraft.date}
                   onChange={(e) => setEventDraft((prev) => ({ ...prev, date: e.target.value }))}
+                  required
+                />
+              </label>
+              <label>
+                Time
+                <input
+                  type="time"
+                  value={eventDraft.time}
+                  onChange={(e) => setEventDraft((prev) => ({ ...prev, time: e.target.value }))}
                   required
                 />
               </label>
@@ -345,15 +396,10 @@ function LeaderManage({ clubs, selectedClub, membershipRequests, announcements, 
                 required
               />
             </label>
-            <label>
-              Category
-              <input
-                value={clubDraft.category}
-                onChange={(e) => setClubDraft((prev) => ({ ...prev, category: e.target.value }))}
-                placeholder="e.g. Technology, Arts, Sport..."
-                required
-              />
-            </label>
+            <ClubCategoryField
+              value={clubDraft.category}
+              onChange={(category) => setClubDraft((prev) => ({ ...prev, category }))}
+            />
             <label>
               Mission
               <textarea
@@ -364,6 +410,10 @@ function LeaderManage({ clubs, selectedClub, membershipRequests, announcements, 
                 required
               />
             </label>
+            <ProposalImagePicker
+              value={clubDraft.imageKey}
+              onChange={(imageKey) => setClubDraft((prev) => ({ ...prev, imageKey }))}
+            />
             <button type="submit" className="primary-button" disabled={clubsSaving}>
               {clubsSaving ? 'Submitting...' : 'Submit for approval'}
             </button>
@@ -479,7 +529,8 @@ function MemberManage({ clubs, clubRequests, membershipRequests, currentUser }) 
             ) : null}
             {myProposals.map((req) => (
               <article key={req.id} className="action-row">
-                <div>
+                <ProposalThumbnail imageKey={req.imageKey} />
+                <div className="proposal-list-copy">
                   <strong>{req.name}</strong>
                   <p>{req.category}</p>
                   {req.mission ? <span>{req.mission}</span> : null}
@@ -527,15 +578,10 @@ function MemberManage({ clubs, clubRequests, membershipRequests, currentUser }) 
                 required
               />
             </label>
-            <label>
-              Category
-              <input
-                value={clubDraft.category}
-                onChange={(e) => setClubDraft((prev) => ({ ...prev, category: e.target.value }))}
-                placeholder="e.g. Technology, Arts, Sport..."
-                required
-              />
-            </label>
+            <ClubCategoryField
+              value={clubDraft.category}
+              onChange={(category) => setClubDraft((prev) => ({ ...prev, category }))}
+            />
             <label>
               Mission
               <textarea
@@ -546,6 +592,10 @@ function MemberManage({ clubs, clubRequests, membershipRequests, currentUser }) 
                 required
               />
             </label>
+            <ProposalImagePicker
+              value={clubDraft.imageKey}
+              onChange={(imageKey) => setClubDraft((prev) => ({ ...prev, imageKey }))}
+            />
             <button type="submit" className="primary-button" disabled={clubsSaving}>
               {clubsSaving ? 'Submitting...' : 'Submit for approval'}
             </button>

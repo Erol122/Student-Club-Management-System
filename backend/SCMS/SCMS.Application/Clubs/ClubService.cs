@@ -51,6 +51,7 @@ public sealed class ClubService(IClubRepository clubRepository) : IClubService
             request.Slug,
             request.Description,
             request.Category,
+            request.ImageKey,
             request.GroupPlatform,
             request.GroupLink,
             request.Status);
@@ -70,6 +71,7 @@ public sealed class ClubService(IClubRepository clubRepository) : IClubService
             slugResult.Value!,
             NormalizeOptionalText(request.Description),
             NormalizeOptionalText(request.Category),
+            NormalizeOptionalText(request.ImageKey),
             NormalizeOptionalText(request.GroupPlatform),
             NormalizeOptionalText(request.GroupLink),
             request.Status,
@@ -87,9 +89,43 @@ public sealed class ClubService(IClubRepository clubRepository) : IClubService
         UpdateClubRequest request,
         CancellationToken cancellationToken)
     {
-        if (!currentUser.IsAdmin)
+        var club = await clubRepository.GetByIdForUpdateAsync(id, cancellationToken);
+        if (club is null)
+        {
+            return ServiceResult<ClubDto>.Failure(new ServiceError(
+                ServiceErrorType.NotFound,
+                "Club was not found."));
+        }
+
+        var canManageClub = currentUser.IsAdmin || IsPresidentOfClub(club, currentUser.Id);
+        if (!canManageClub)
         {
             return ServiceResult<ClubDto>.Failure(ForbiddenError());
+        }
+
+        if (!currentUser.IsAdmin)
+        {
+            var groupLinkError = ValidateGroupLink(request.GroupLink);
+            if (groupLinkError is not null)
+            {
+                return ServiceResult<ClubDto>.Failure(groupLinkError);
+            }
+
+            var groupLink = NormalizeOptionalText(request.GroupLink);
+            club.UpdateDetails(
+                club.Name,
+                club.Slug,
+                club.Description,
+                club.Category,
+                club.ImageKey,
+                groupLink is null ? null : "WhatsApp",
+                groupLink,
+                club.Status,
+                club.CreatedByUserId);
+
+            await clubRepository.SaveChangesAsync(cancellationToken);
+
+            return ServiceResult<ClubDto>.Success(ToDto(club));
         }
 
         var validationError = ValidateRequest(
@@ -97,20 +133,13 @@ public sealed class ClubService(IClubRepository clubRepository) : IClubService
             request.Slug,
             request.Description,
             request.Category,
+            request.ImageKey,
             request.GroupPlatform,
             request.GroupLink,
             request.Status);
         if (validationError is not null)
         {
             return ServiceResult<ClubDto>.Failure(validationError);
-        }
-
-        var club = await clubRepository.GetByIdForUpdateAsync(id, cancellationToken);
-        if (club is null)
-        {
-            return ServiceResult<ClubDto>.Failure(new ServiceError(
-                ServiceErrorType.NotFound,
-                "Club was not found."));
         }
 
         var slugResult = await ValidateSlugAsync(request.Slug, request.Name, id, cancellationToken);
@@ -133,14 +162,23 @@ public sealed class ClubService(IClubRepository clubRepository) : IClubService
             slugResult.Value!,
             NormalizeOptionalText(request.Description),
             NormalizeOptionalText(request.Category),
-            NormalizeOptionalText(request.GroupPlatform),
-            NormalizeOptionalText(request.GroupLink),
+            NormalizeOptionalText(request.ImageKey),
+            club.GroupPlatform,
+            club.GroupLink,
             request.Status,
             createdByUserId);
 
         await clubRepository.SaveChangesAsync(cancellationToken);
 
         return ServiceResult<ClubDto>.Success(ToDto(club));
+    }
+
+    private static bool IsPresidentOfClub(Club club, Guid userId)
+    {
+        return club.Memberships.Any(membership =>
+            membership.UserId == userId &&
+            membership.Status == ClubMembershipStatus.Approved &&
+            membership.Role == ClubMembershipRole.President);
     }
 
     private async Task<ServiceResult<string>> ValidateSlugAsync(
@@ -172,6 +210,7 @@ public sealed class ClubService(IClubRepository clubRepository) : IClubService
         string? slug,
         string? description,
         string? category,
+        string? imageKey,
         string? groupPlatform,
         string? groupLink,
         ClubStatus status)
@@ -207,6 +246,11 @@ public sealed class ClubService(IClubRepository clubRepository) : IClubService
             errors[nameof(groupPlatform)] = ["Group platform cannot exceed 100 characters."];
         }
 
+        if (!string.IsNullOrWhiteSpace(imageKey) && imageKey.Trim().Length > 100)
+        {
+            errors[nameof(imageKey)] = ["Image key cannot exceed 100 characters."];
+        }
+
         if (!string.IsNullOrWhiteSpace(groupLink) && groupLink.Trim().Length > 500)
         {
             errors[nameof(groupLink)] = ["Group link cannot exceed 500 characters."];
@@ -222,11 +266,21 @@ public sealed class ClubService(IClubRepository clubRepository) : IClubService
             : new ServiceError(ServiceErrorType.Validation, "Club data is invalid.", errors);
     }
 
+    private static ServiceError? ValidateGroupLink(string? groupLink)
+    {
+        if (!string.IsNullOrWhiteSpace(groupLink) && groupLink.Trim().Length > 500)
+        {
+            return ValidationError(nameof(groupLink), "Group link cannot exceed 500 characters.");
+        }
+
+        return null;
+    }
+
     private static ClubDto ToDto(Club club)
     {
         var members = club.Memberships
             .Where(membership => membership.Status == ClubMembershipStatus.Approved)
-            .OrderBy(membership => membership.Role)
+            .OrderByDescending(membership => membership.Role)
             .ThenBy(membership => membership.User.DisplayName)
             .Select(membership => new ClubMemberDto(
                 membership.Id,
@@ -244,6 +298,7 @@ public sealed class ClubService(IClubRepository clubRepository) : IClubService
             club.Slug,
             club.Description,
             club.Category,
+            club.ImageKey,
             club.GroupPlatform,
             club.GroupLink,
             club.Status,

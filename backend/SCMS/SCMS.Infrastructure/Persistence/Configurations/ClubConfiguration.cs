@@ -26,6 +26,9 @@ public sealed class ClubConfiguration : IEntityTypeConfiguration<Club>
         builder.Property(x => x.Category)
             .HasMaxLength(100);
 
+        builder.Property(x => x.ImageKey)
+            .HasMaxLength(100);
+
         builder.Property(x => x.GroupPlatform)
             .HasMaxLength(100);
 

@@ -8,17 +8,8 @@ const VIEW_LABELS = {
 
 export const Topbar = memo(function Topbar({
   activeView,
-  currentUser,
 }) {
   const { title, sub } = VIEW_LABELS[activeView] ?? VIEW_LABELS.home;
-  const initials =
-    currentUser?.avatar ??
-    currentUser?.name
-      ?.split(' ')
-      .map((p) => p[0])
-      .join('')
-      .slice(0, 2) ??
-    '?';
 
   return (
     <header className="topbar">
@@ -26,12 +17,6 @@ export const Topbar = memo(function Topbar({
         <p className="eyebrow">Student Club Management</p>
         <h1 className="topbar-title">{title}</h1>
         <p className="topbar-sub">{sub}</p>
-      </div>
-
-      <div className="topbar-controls">
-        <div className="user-avatar topbar-avatar" title={currentUser?.name}>
-          {initials}
-        </div>
       </div>
     </header>
   );

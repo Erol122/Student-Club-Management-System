@@ -63,7 +63,6 @@ const AuthenticatedShell = memo(function AuthenticatedShell({ currentUser }) {
       <main className="platform-main">
         <Topbar
           activeView={activeView}
-          currentUser={currentUser}
         />
 
         <Suspense fallback={<div className="view-loading">Loading workspace...</div>}>

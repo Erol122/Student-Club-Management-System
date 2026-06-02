@@ -292,9 +292,9 @@ export function reducer(state, action) {
       return {
         ...state,
         clubsSaving: false,
-        events: [...state.events, evt].sort((a, b) => new Date(a.date) - new Date(b.date)),
+        events: [...state.events, evt].sort((a, b) => new Date(a.startAt) - new Date(b.startAt)),
         activityLog: [
-          logEntry(`Event scheduled: "${evt.title}" on ${evt.date}`, 'event'),
+          logEntry(`Event scheduled: "${evt.title}" on ${evt.date}${evt.time ? ` at ${evt.time}` : ''}`, 'event'),
           ...state.activityLog,
         ],
         toast: { message: `"${evt.title}" added to the calendar`, type: 'success' },

@@ -8,5 +8,6 @@ public sealed record CreateClubRequest(
     string? Description,
     string? Category,
     ClubStatus Status = ClubStatus.Draft,
+    string? ImageKey = null,
     string? GroupPlatform = null,
     string? GroupLink = null);

@@ -2,8 +2,25 @@ import { memo, useCallback, useMemo, useState } from 'react';
 import { useAppDispatch, useAppState } from '../../context/AppContext';
 import { useClubActions } from '../../context/clubActions';
 import { APP_ROLES } from '../../domain/roles';
+import { CLUB_CATEGORY_OPTIONS } from '../../data/clubCategories';
+import { clubProposalImageByKey } from '../../data/clubProposalImages';
+import { ClubThumbnail } from '../common/ClubMedia';
 import { SectionCard } from '../common/SectionCard';
 import { ClubDrawer } from '../common/ClubDrawer';
+
+const formatSubmittedDate = (value) => {
+  if (!value) return 'Not recorded';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Not recorded';
+
+  return new Intl.DateTimeFormat('en', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+};
 
 export const ClubsView = memo(function ClubsView({
   activeRole,
@@ -32,7 +49,14 @@ export const ClubsView = memo(function ClubsView({
 
   const [memberView, setMemberView] = useState('my-clubs');
   const [isDrawerOpen, setDrawerOpen] = useState(false);
-  const categories = useMemo(() => ['All', ...new Set(clubs.map((club) => club.category))], [clubs]);
+  const [selectedProposal, setSelectedProposal] = useState(null);
+  const categories = useMemo(() => {
+    const customCategories = clubs
+      .map((club) => club.category)
+      .filter((category) => category && !CLUB_CATEGORY_OPTIONS.includes(category));
+
+    return ['All', ...CLUB_CATEGORY_OPTIONS, ...new Set(customCategories)];
+  }, [clubs]);
 
   const filterClubs = useCallback((clubList) => {
     let result = clubList;
@@ -101,6 +125,18 @@ export const ClubsView = memo(function ClubsView({
     if (left) closeDrawer();
   }, [leaveClubRecord, closeDrawer]);
 
+  const closeProposalModal = useCallback(() => setSelectedProposal(null), []);
+
+  const handleApproveProposal = useCallback(async (proposalId) => {
+    const approved = await approveClubProposalRecord(proposalId);
+    if (approved) closeProposalModal();
+  }, [approveClubProposalRecord, closeProposalModal]);
+
+  const handleRejectProposal = useCallback(async (proposalId) => {
+    const rejected = await rejectClubProposalRecord(proposalId);
+    if (rejected) closeProposalModal();
+  }, [rejectClubProposalRecord, closeProposalModal]);
+
   // ── Admin ──────────────────────────────────────────────────────────────────
   if (activeRole === APP_ROLES.Admin) {
     return (
@@ -111,32 +147,46 @@ export const ClubsView = memo(function ClubsView({
             subtitle={`${clubRequests.length} pending — review and approve or reject`}
           >
             <div className="action-list">
-              {clubRequests.map((req) => (
-                <article key={req.id} className="action-row">
-                  <div>
-                    <strong>{req.name}</strong>
-                    <p>{req.category} · {req.mission}</p>
-                  </div>
-                  <div className="inline-actions">
+              {clubRequests.map((req) => {
+                const proposalImage = clubProposalImageByKey.get(req.imageKey);
+
+                return (
+                  <article key={req.id} className="action-row proposal-action-row">
                     <button
                       type="button"
-                      className="ghost-button"
-                      onClick={() => rejectClubProposalRecord(req.id)}
-                      disabled={clubsSaving}
+                      className="proposal-summary-button"
+                      onClick={() => setSelectedProposal(req)}
+                      aria-label={`View ${req.name} proposal details`}
                     >
-                      Reject
+                      {proposalImage ? (
+                        <img className="proposal-row-image" src={proposalImage.src} alt="" />
+                      ) : null}
+                      <span className="proposal-row-copy">
+                        <strong>{req.name}</strong>
+                        <p>{req.category} · {req.mission}</p>
+                      </span>
                     </button>
-                    <button
-                      type="button"
-                      className="primary-button"
-                      onClick={() => approveClubProposalRecord(req.id)}
-                      disabled={clubsSaving}
-                    >
-                      Approve
-                    </button>
-                  </div>
-                </article>
-              ))}
+                    <div className="inline-actions">
+                      <button
+                        type="button"
+                        className="ghost-button"
+                        onClick={() => handleRejectProposal(req.id)}
+                        disabled={clubsSaving}
+                      >
+                        Reject
+                      </button>
+                      <button
+                        type="button"
+                        className="primary-button"
+                        onClick={() => handleApproveProposal(req.id)}
+                        disabled={clubsSaving}
+                      >
+                        Approve
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           </SectionCard>
         ) : null}
@@ -177,6 +227,7 @@ export const ClubsView = memo(function ClubsView({
                 className={`club-list-row ${isDrawerOpen && selectedClubId === club.id ? 'selected' : ''}`.trim()}
                 onClick={() => openDrawer(club.id)}
               >
+                <ClubThumbnail imageKey={club.imageKey} name={club.name} />
                 <span className="club-list-main">
                   <strong>{club.name}</strong>
                   <span>{club.summary}</span>
@@ -201,6 +252,16 @@ export const ClubsView = memo(function ClubsView({
             onDelete={handleDeleteClub}
             onSave={handleSaveClub}
             isSaving={clubsSaving}
+          />
+        ) : null}
+
+        {selectedProposal ? (
+          <ProposalDetailsModal
+            proposal={selectedProposal}
+            isSaving={clubsSaving}
+            onClose={closeProposalModal}
+            onApprove={handleApproveProposal}
+            onReject={handleRejectProposal}
           />
         ) : null}
       </div>
@@ -246,6 +307,7 @@ export const ClubsView = memo(function ClubsView({
                   className={`club-list-row ${isDrawerOpen && selectedClubId === club.id ? 'selected' : ''}`.trim()}
                   onClick={() => openDrawer(club.id)}
                 >
+                  <ClubThumbnail imageKey={club.imageKey} name={club.name} />
                   <span className="club-list-main">
                     <strong>{club.name}</strong>
                     <span>{club.summary}</span>
@@ -299,6 +361,7 @@ export const ClubsView = memo(function ClubsView({
                       style={{ cursor: 'pointer' }}
                       onClick={() => openDrawer(club.id)}
                     >
+                      <ClubThumbnail imageKey={club.imageKey} name={club.name} className="directory-card-image" />
                       <div className="directory-card-top">
                         <span className="directory-category">{club.category}</span>
                       </div>
@@ -381,6 +444,7 @@ export const ClubsView = memo(function ClubsView({
               className={`club-list-row ${isDrawerOpen && selectedClubId === club.id ? 'selected' : ''}`.trim()}
               onClick={() => openDrawer(club.id)}
             >
+              <ClubThumbnail imageKey={club.imageKey} name={club.name} />
               <span className="club-list-main">
                 <strong>{club.name}</strong>
                 <span>{club.summary}</span>
@@ -402,8 +466,76 @@ export const ClubsView = memo(function ClubsView({
           announcements={announcements}
           events={events}
           onClose={closeDrawer}
+          onSave={handleSaveClub}
+          editMode="whatsapp"
+          isSaving={clubsSaving}
         />
       ) : null}
     </div>
   );
 });
+
+function ProposalDetailsModal({ proposal, isSaving, onClose, onApprove, onReject }) {
+  const studentName = proposal.proposedBy || proposal.student || 'Unknown student';
+  const studentEmail = proposal.proposedByEmail || proposal.email || 'No email provided';
+  const proposalImage = clubProposalImageByKey.get(proposal.imageKey);
+
+  return (
+    <>
+      <div className="modal-backdrop" onClick={onClose} />
+      <div className="modal-card proposal-modal-card" role="dialog" aria-modal="true" aria-labelledby="proposal-modal-title">
+        {proposalImage ? (
+          <img className="proposal-modal-image" src={proposalImage.src} alt="" />
+        ) : null}
+        <div className="proposal-modal-header">
+          <div>
+            <p className="proposal-modal-kicker">Club proposal</p>
+            <h3 className="modal-title" id="proposal-modal-title">{proposal.name}</h3>
+          </div>
+          <button type="button" className="modal-close-button" onClick={onClose} aria-label="Close proposal details">
+            &times;
+          </button>
+        </div>
+
+        <div className="proposal-modal-body">
+          <div className="proposal-detail-grid">
+            <div className="proposal-detail-item">
+              <span>Submitted by</span>
+              <strong>{studentName}</strong>
+            </div>
+            <div className="proposal-detail-item">
+              <span>Email</span>
+              <strong>{studentEmail}</strong>
+            </div>
+            <div className="proposal-detail-item">
+              <span>Category</span>
+              <strong>{proposal.category || 'General'}</strong>
+            </div>
+            <div className="proposal-detail-item">
+              <span>Status</span>
+              <strong>{proposal.status || 'Pending'}</strong>
+            </div>
+            <div className="proposal-detail-item proposal-detail-wide">
+              <span>Submitted</span>
+              <strong>{formatSubmittedDate(proposal.submittedAt)}</strong>
+            </div>
+          </div>
+
+          <section className="proposal-mission-panel">
+            <span>Mission</span>
+            <p>{proposal.mission || 'No mission provided.'}</p>
+          </section>
+        </div>
+
+        <div className="modal-actions">
+          <button type="button" className="ghost-button" onClick={() => onReject(proposal.id)} disabled={isSaving}>
+            Reject
+          </button>
+          <button type="button" className="primary-button" onClick={() => onApprove(proposal.id)} disabled={isSaving}>
+            Approve
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}

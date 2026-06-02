@@ -9,6 +9,7 @@ public sealed class Club : BaseEntity
     public string Slug { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string? Category { get; set; }
+    public string? ImageKey { get; set; }
     public string? GroupPlatform { get; set; }
     public string? GroupLink { get; set; }
     public ClubStatus Status { get; set; } = ClubStatus.Draft;
@@ -25,6 +26,7 @@ public sealed class Club : BaseEntity
         string slug,
         string? description,
         string? category,
+        string? imageKey,
         string? groupPlatform,
         string? groupLink,
         ClubStatus status,
@@ -36,6 +38,7 @@ public sealed class Club : BaseEntity
             Slug = slug,
             Description = description,
             Category = category,
+            ImageKey = imageKey,
             GroupPlatform = groupPlatform,
             GroupLink = groupLink,
             Status = status,
@@ -48,6 +51,7 @@ public sealed class Club : BaseEntity
         string slug,
         string mission,
         string? category,
+        string? imageKey,
         User proposer)
     {
         return new Club
@@ -57,6 +61,7 @@ public sealed class Club : BaseEntity
             Slug = slug,
             Description = mission,
             Category = category,
+            ImageKey = imageKey,
             Status = ClubStatus.Draft,
             CreatedByUserId = proposer.Id,
             CreatedByUser = proposer
@@ -68,6 +73,7 @@ public sealed class Club : BaseEntity
         string slug,
         string? description,
         string? category,
+        string? imageKey,
         string? groupPlatform,
         string? groupLink,
         ClubStatus status,
@@ -77,6 +83,7 @@ public sealed class Club : BaseEntity
         Slug = slug;
         Description = description;
         Category = category;
+        ImageKey = imageKey;
         GroupPlatform = groupPlatform;
         GroupLink = groupLink;
         Status = status;

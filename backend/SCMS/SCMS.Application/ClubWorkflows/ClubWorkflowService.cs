@@ -44,6 +44,7 @@ public sealed class ClubWorkflowService(IClubWorkflowRepository repository) : IC
             slug,
             request.Mission.Trim(),
             NormalizeOptionalText(request.Category),
+            NormalizeOptionalText(request.ImageKey),
             proposer);
 
         await repository.AddClubAsync(club, cancellationToken);
@@ -393,6 +394,7 @@ public sealed class ClubWorkflowService(IClubWorkflowRepository repository) : IC
             club.CreatedByUserId,
             club.CreatedByUser?.DisplayName ?? "Unknown student",
             club.CreatedByUser?.Email,
+            club.ImageKey,
             club.CreatedAt,
             club.UpdatedAt);
     }
@@ -457,6 +459,11 @@ public sealed class ClubWorkflowService(IClubWorkflowRepository repository) : IC
         else if (request.Mission.Trim().Length > 2000)
         {
             errors[nameof(request.Mission)] = ["Mission cannot exceed 2000 characters."];
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.ImageKey) && request.ImageKey.Trim().Length > 100)
+        {
+            errors[nameof(request.ImageKey)] = ["Image key cannot exceed 100 characters."];
         }
 
         return errors.Count == 0

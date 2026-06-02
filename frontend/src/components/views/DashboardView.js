@@ -4,6 +4,7 @@ import { useClubActions } from '../../context/clubActions';
 import { APP_ROLES } from '../../domain/roles';
 import { SectionCard } from '../common/SectionCard';
 import { ClubDrawer } from '../common/ClubDrawer';
+import { ClubThumbnail } from '../common/ClubMedia';
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 function parseDateBadge(dateStr) {
@@ -19,6 +20,10 @@ function timeAgo(ts) {
   if (d < 3_600_000) return `${Math.floor(d / 60_000)}m ago`;
   if (d < 86_400_000) return `${Math.floor(d / 3_600_000)}h ago`;
   return `${Math.floor(d / 86_400_000)}d ago`;
+}
+
+function clubNameForEvent(event, clubs) {
+  return clubs.find((club) => club.id === event.clubId)?.name ?? 'Unknown club';
 }
 
 function StatGrid({ items }) {
@@ -45,8 +50,8 @@ function AdminHome({ clubs, clubRequests, membershipRequests, events, activityLo
   const upcoming = useMemo(
     () =>
       events
-        .filter((e) => new Date(e.date) >= today)
-        .sort((a, b) => new Date(a.date) - new Date(b.date))
+        .filter((e) => new Date(e.startAt) >= today)
+        .sort((a, b) => new Date(a.startAt) - new Date(b.startAt))
         .slice(0, 5),
     [events, today]
   );
@@ -149,8 +154,8 @@ function LeaderHome({ clubs, selectedClub, membershipRequests, announcements, ev
   const clubEvents = useMemo(
     () =>
       events
-        .filter((e) => e.clubId === selectedClub?.id && new Date(e.date) >= today)
-        .sort((a, b) => new Date(a.date) - new Date(b.date))
+        .filter((e) => e.clubId === selectedClub?.id && new Date(e.startAt) >= today)
+        .sort((a, b) => new Date(a.startAt) - new Date(b.startAt))
         .slice(0, 5),
     [events, selectedClub?.id, today]
   );
@@ -239,7 +244,7 @@ function LeaderHome({ clubs, selectedClub, membershipRequests, announcements, ev
                   <strong>{event.title}</strong>
                   <p>{event.location}</p>
                 </div>
-                <span>{event.date}</span>
+                <span>{event.time ? `${event.date} · ${event.time}` : event.date}</span>
               </article>
             ))}
           </div>
@@ -269,8 +274,8 @@ function MemberHome({ clubs, membershipRequests, announcements, events, currentU
   const today = useMemo(() => { const d = new Date(); d.setHours(0,0,0,0); return d; }, []);
   const myEvents = useMemo(
     () => events
-      .filter((e) => myClubIds.includes(e.clubId) && new Date(e.date) >= today)
-      .sort((a, b) => new Date(a.date) - new Date(b.date))
+      .filter((e) => myClubIds.includes(e.clubId) && new Date(e.startAt) >= today)
+      .sort((a, b) => new Date(a.startAt) - new Date(b.startAt))
       .slice(0, 5),
     [events, myClubIds, today]
   );
@@ -315,15 +320,20 @@ function MemberHome({ clubs, membershipRequests, announcements, events, currentU
         >
           {myEvents.map((event) => {
             const { day, month } = parseDateBadge(event.date);
+            const clubName = clubNameForEvent(event, clubs);
+
             return (
-              <article key={event.id} className="event-card">
+              <article key={event.id} className="event-card member-event-card">
                 <div className="event-date-badge">
                   <span className="event-date-day">{day}</span>
                   <span className="event-date-month">{month}</span>
                 </div>
                 <div className="event-card-body">
-                  <strong>{event.title}</strong>
-                  <p>{event.location}</p>
+                  <div className="event-card-heading">
+                    <strong>{event.title}</strong>
+                    <span className="event-club-pill">{clubName}</span>
+                  </div>
+                  <p>{event.location}{event.time ? ` · ${event.time}` : ''}</p>
                 </div>
               </article>
             );
@@ -351,14 +361,17 @@ function MemberHome({ clubs, membershipRequests, announcements, events, currentU
               <article key={club.id} className="action-row">
                 <button
                   type="button"
-                  style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', flex: 1 }}
+                  className="club-action-button"
                   onClick={() => {
                     dispatch({ type: 'SELECT_CLUB', payload: club.id });
                     setDrawerOpen(true);
                   }}
                 >
-                  <strong>{club.name}</strong>
-                  <p>{club.category}</p>
+                  <ClubThumbnail imageKey={club.imageKey} name={club.name} />
+                  <span className="club-list-main">
+                    <strong>{club.name}</strong>
+                    <span>{club.category}</span>
+                  </span>
                 </button>
               </article>
             ))}

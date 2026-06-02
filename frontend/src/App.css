@@ -215,19 +215,6 @@ textarea {
   max-width: 560px;
 }
 
-.topbar-controls {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.topbar-avatar {
-  width: 44px;
-  height: 44px;
-}
-
 .control-card,
 .user-chip {
   background: rgba(255, 255, 255, 0.92);
@@ -538,6 +525,103 @@ textarea {
   gap: 8px;
 }
 
+.proposal-action-row {
+  align-items: center;
+  min-height: 82px;
+}
+
+.proposal-summary-button {
+  appearance: none;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  padding: 6px;
+  text-align: left;
+}
+
+.proposal-summary-button:hover {
+  background: #f4f8fd;
+}
+
+.proposal-summary-button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.proposal-list-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.proposal-row-copy {
+  display: block;
+  min-width: 0;
+}
+
+.proposal-row-image {
+  width: 78px;
+  height: 58px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid #dbe6f3;
+}
+
+.proposal-list-image {
+  width: 64px;
+  height: 48px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid #dbe6f3;
+}
+
+.club-thumbnail {
+  width: 66px;
+  height: 50px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid #dbe6f3;
+}
+
+.club-action-button {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.member-row-president {
+  border-color: #b9d5f5;
+  background: #f0f7ff;
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+
+.member-row-president .member-avatar {
+  background: linear-gradient(140deg, #1b5a9e, #218f4f);
+}
+
+.member-row-president .role-pill {
+  background: #dff0ff;
+  color: #174a7c;
+}
+
 .primary-button,
 .ghost-button,
 .danger-button {
@@ -624,6 +708,12 @@ textarea {
   border-color: #d4e4fa;
 }
 
+.category-field {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
 .club-view-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -683,6 +773,14 @@ textarea {
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 }
 
+.directory-card-image {
+  width: 100%;
+  aspect-ratio: 16 / 8;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid #dbe6f3;
+}
+
 .directory-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 18px 30px rgba(31, 66, 118, 0.1);
@@ -737,12 +835,17 @@ textarea {
   color: var(--ink);
   cursor: pointer;
   display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(260px, 0.9fr);
-  gap: 16px;
+  grid-template-columns: auto minmax(0, 1fr) minmax(260px, max-content);
+  gap: 12px;
   align-items: center;
-  padding: 14px 16px;
+  padding: 12px;
   text-align: left;
   transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.club-list-row > .club-thumbnail {
+  width: 84px;
+  height: 64px;
 }
 
 .club-list-row:hover,
@@ -782,6 +885,7 @@ textarea {
 .club-list-meta {
   align-items: flex-end;
   font-weight: 700;
+  text-align: right;
 }
 
 /* ── Confirm Modal ─────────────────────────────────────────────────────────── */
@@ -823,6 +927,162 @@ textarea {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+
+.proposal-modal-card {
+  width: min(640px, calc(100vw - 32px));
+  overflow: hidden;
+}
+
+.proposal-modal-image {
+  display: block;
+  width: calc(100% + 60px);
+  height: 180px;
+  margin: -28px -30px 22px;
+  object-fit: cover;
+}
+
+.proposal-modal-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 18px;
+}
+
+.proposal-modal-kicker {
+  margin: 0 0 6px;
+  color: var(--primary);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.modal-close-button {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #f7faff;
+  color: #334867;
+  cursor: pointer;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.proposal-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.proposal-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.proposal-detail-item,
+.proposal-mission-panel {
+  border: 1px solid #e8eef7;
+  border-radius: 12px;
+  background: #f8fbff;
+  padding: 12px;
+}
+
+.proposal-detail-item span,
+.proposal-mission-panel span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.proposal-detail-item strong {
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.proposal-detail-wide {
+  grid-column: 1 / -1;
+}
+
+.proposal-mission-panel p {
+  margin: 0;
+  color: var(--ink);
+  line-height: 1.6;
+}
+
+.proposal-image-picker {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.proposal-image-picker legend {
+  margin-bottom: 8px;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.proposal-image-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 9px;
+}
+
+.proposal-image-option {
+  border: 1px solid #dbe6f3;
+  border-radius: 12px;
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+  min-height: 78px;
+  overflow: hidden;
+  padding: 0;
+  position: relative;
+  text-align: left;
+}
+
+.proposal-image-option img {
+  display: block;
+  width: 100%;
+  height: 78px;
+  object-fit: cover;
+}
+
+.proposal-image-option span {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.88);
+  color: #1d324e;
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 5px 7px;
+}
+
+.proposal-image-option.selected {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(36, 78, 134, 0.14);
+}
+
+.proposal-image-none {
+  display: grid;
+  place-items: center;
+  background: #f7faff;
+  color: #425b7d;
+  font-weight: 800;
+}
+
+.proposal-image-none.selected {
+  background: #edf4ff;
 }
 
 /* ── Event date badge cards ────────────────────────────────────────────────── */
@@ -882,6 +1142,27 @@ textarea {
   display: block;
   font-size: 0.9rem;
   margin-bottom: 3px;
+}
+
+.event-card-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 3px;
+}
+
+.event-card-heading strong {
+  margin-bottom: 0;
+}
+
+.event-club-pill {
+  border-radius: 999px;
+  background: #eaf3ff;
+  color: #214d86;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 4px 8px;
 }
 
 .event-card-body p {
@@ -1011,6 +1292,54 @@ textarea {
   margin-top: 16px;
   display: flex;
   justify-content: flex-start;
+}
+
+.whatsapp-card {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid #cfe0f6;
+  border-radius: 12px;
+  background: #f7fbff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.whatsapp-card-copy {
+  min-width: 0;
+}
+
+.whatsapp-card-copy strong {
+  display: block;
+  color: #142035;
+  font-weight: 850;
+}
+
+.whatsapp-card-copy p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.whatsapp-link-preview {
+  display: block;
+  margin-top: 8px;
+  color: #214d86;
+  font-size: 0.82rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.whatsapp-card-actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .club-drawer .detail-grid {
@@ -1449,10 +1778,6 @@ textarea {
     flex-direction: column;
   }
 
-  .topbar-controls {
-    justify-content: flex-start;
-  }
-
   .dashboard-grid,
   .directory-layout,
   .login-cards {
@@ -1460,15 +1785,31 @@ textarea {
   }
 
   .club-list-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: flex-start;
     gap: 10px;
   }
 
   .club-list-meta {
     align-items: flex-start;
+    grid-column: 2;
+    text-align: left;
   }
 
   .detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .whatsapp-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .whatsapp-card-actions {
+    justify-content: flex-start;
+  }
+
+  .proposal-detail-grid {
     grid-template-columns: 1fr;
   }
 }

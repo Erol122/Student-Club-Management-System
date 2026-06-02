@@ -10,7 +10,7 @@ export async function parseResponse(response) {
   const contentType = response.headers.get('content-type') ?? '';
   const hasBody = response.status !== 204;
   const body = hasBody
-    ? contentType.includes('application/json')
+    ? contentType.includes('application/json') || contentType.includes('+json')
       ? await response.json()
       : await response.text()
     : null;

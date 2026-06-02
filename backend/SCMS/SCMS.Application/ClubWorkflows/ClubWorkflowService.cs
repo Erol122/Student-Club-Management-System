@@ -44,6 +44,7 @@ public sealed class ClubWorkflowService(IClubWorkflowRepository repository) : IC
             slug,
             request.Mission.Trim(),
             NormalizeOptionalText(request.Category),
+            NormalizeOptionalText(request.ImageKey),
             proposer);
 
         await repository.AddClubAsync(club, cancellationToken);
@@ -272,6 +273,32 @@ public sealed class ClubWorkflowService(IClubWorkflowRepository repository) : IC
         return ServiceResult.Success();
     }
 
+    public async Task<ServiceResult> LeaveClubAsync(
+        CurrentUserDto currentUser,
+        Guid clubId,
+        CancellationToken cancellationToken)
+    {
+        var membership = await repository.GetApprovedMembershipAsync(clubId, currentUser.Id, cancellationToken);
+        if (membership is null)
+        {
+            return ServiceResult.Failure(new ServiceError(
+                ServiceErrorType.NotFound,
+                "You are not an active member of this club."));
+        }
+
+        if (membership.Role == ClubMembershipRole.President)
+        {
+            return ServiceResult.Failure(new ServiceError(
+                ServiceErrorType.Conflict,
+                "Club leaders cannot leave the club. Please transfer leadership or delete the club instead."));
+        }
+
+        membership.Status = ClubMembershipStatus.Inactive;
+        await repository.SaveChangesAsync(cancellationToken);
+
+        return ServiceResult.Success();
+    }
+
     private async Task<ServiceResult<JoinRequestDto>> ReviewJoinRequestAsync(
         CurrentUserDto currentUser,
         Guid requestId,
@@ -367,6 +394,7 @@ public sealed class ClubWorkflowService(IClubWorkflowRepository repository) : IC
             club.CreatedByUserId,
             club.CreatedByUser?.DisplayName ?? "Unknown student",
             club.CreatedByUser?.Email,
+            club.ImageKey,
             club.CreatedAt,
             club.UpdatedAt);
     }
@@ -431,6 +459,11 @@ public sealed class ClubWorkflowService(IClubWorkflowRepository repository) : IC
         else if (request.Mission.Trim().Length > 2000)
         {
             errors[nameof(request.Mission)] = ["Mission cannot exceed 2000 characters."];
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.ImageKey) && request.ImageKey.Trim().Length > 100)
+        {
+            errors[nameof(request.ImageKey)] = ["Image key cannot exceed 100 characters."];
         }
 
         return errors.Count == 0

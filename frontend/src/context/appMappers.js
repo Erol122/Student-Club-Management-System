@@ -1,9 +1,13 @@
 import { CLUB_MEMBER_ROLES } from '../domain/roles';
+import { normalizeClubCategory } from '../data/clubCategories';
 
 const fmtDate = (ts) =>
   new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short', year: 'numeric' }).format(
     new Date(ts)
   );
+
+const fmtTime = (ts) =>
+  new Intl.DateTimeFormat('en', { hour: '2-digit', minute: '2-digit' }).format(new Date(ts));
 
 const STATUS_LABELS = {
   1: 'Draft',
@@ -19,9 +23,16 @@ const STATUS_VALUES = {
   Active: 2,
   Archived: 3,
 };
+const PROPOSAL_STATUS_LABELS = {
+  1: 'Pending',
+  2: 'Approved',
+  3: 'Rejected',
+  Draft: 'Pending',
+  Active: 'Approved',
+  Archived: 'Rejected',
+};
 
 const DEFAULT_ACCENT = '#5b8def';
-const DEFAULT_GROUP_PLATFORM = 'WhatsApp';
 const DEFAULT_NEXT_EVENT = 'No event scheduled';
 const DEFAULT_LEADER = 'Club admin';
 const ROLE_LABELS = {
@@ -33,6 +44,7 @@ const ROLE_LABELS = {
   Officer: CLUB_MEMBER_ROLES.Officer,
   VicePresident: CLUB_MEMBER_ROLES.VicePresident,
   President: CLUB_MEMBER_ROLES.President,
+  'Club Leader': CLUB_MEMBER_ROLES.President,
 };
 
 export function logEntry(message, type = 'info') {
@@ -42,6 +54,15 @@ export function logEntry(message, type = 'info') {
     message,
     ts: Date.now(),
   };
+}
+
+function detectPlatform(url) {
+  if (!url) return null;
+  if (url.includes('whatsapp.com')) return 'WhatsApp';
+  if (url.includes('discord.gg') || url.includes('discord.com')) return 'Discord';
+  if (url.includes('t.me') || url.includes('telegram')) return 'Telegram';
+  if (url.includes('teams.microsoft.com')) return 'Microsoft Teams';
+  return 'Chat group';
 }
 
 function slugify(value) {
@@ -70,14 +91,15 @@ export function mapApiClubToUi(dto, existingClub = null) {
   return {
     id: dto.id,
     name: dto.name,
-    category: dto.category ?? existingClub?.category ?? 'General',
+    category: normalizeClubCategory(dto.category ?? existingClub?.category),
     summary: dto.description ?? existingClub?.summary ?? 'No description yet.',
+    imageKey: dto.imageKey ?? existingClub?.imageKey ?? '',
     leader: owner?.name ?? existingClub?.leader ?? DEFAULT_LEADER,
     accent: existingClub?.accent ?? DEFAULT_ACCENT,
     health: normalizeClubStatus(dto.status),
     nextEvent: existingClub?.nextEvent ?? DEFAULT_NEXT_EVENT,
-    groupPlatform: dto.groupPlatform ?? existingClub?.groupPlatform ?? DEFAULT_GROUP_PLATFORM,
-    groupLink: dto.groupLink ?? existingClub?.groupLink ?? '',
+    groupPlatform: 'groupPlatform' in dto ? (dto.groupPlatform || '') : (existingClub?.groupPlatform ?? ''),
+    groupLink: 'groupLink' in dto ? (dto.groupLink || '') : (existingClub?.groupLink ?? ''),
     announcementsCount: existingClub?.announcementsCount ?? 0,
     members,
     slug: dto.slug,
@@ -91,11 +113,14 @@ export function mapProposalToUi(dto) {
   return {
     id: dto.id,
     name: dto.name,
-    category: dto.category ?? 'General',
+    category: normalizeClubCategory(dto.category),
     proposedBy: dto.proposedBy,
     proposedByEmail: dto.proposedByEmail,
     mission: dto.mission,
-    status: dto.status,
+    status: PROPOSAL_STATUS_LABELS[dto.status] ?? dto.status ?? 'Pending',
+    imageKey: dto.imageKey ?? '',
+    submittedAt: dto.submittedAt,
+    updatedAt: dto.updatedAt,
   };
 }
 
@@ -133,6 +158,7 @@ export function mapEventToUi(dto) {
     title: dto.title,
     description: dto.description ?? '',
     date: startAt ? startAt.slice(0, 10) : '',
+    time: startAt ? fmtTime(startAt) : '',
     location: dto.location ?? 'TBA',
     startAt,
     endAt: dto.endAt,
@@ -143,8 +169,9 @@ export function mapEventToUi(dto) {
 export function mapUiProposalToRequest(draft) {
   return {
     name: draft.name.trim(),
-    category: draft.category.trim(),
+    category: normalizeClubCategory(draft.category),
     mission: draft.mission.trim(),
+    imageKey: draft.imageKey || null,
   };
 }
 
@@ -153,10 +180,11 @@ export function mapUiClubToCreateRequest(draft) {
     name: draft.name.trim(),
     slug: slugify(draft.name),
     description: draft.summary.trim(),
-    category: draft.category.trim(),
+    category: normalizeClubCategory(draft.category),
     status: STATUS_VALUES[draft.health] ?? STATUS_VALUES.Active,
-    groupPlatform: draft.groupPlatform.trim(),
-    groupLink: draft.groupLink.trim(),
+    imageKey: draft.imageKey || null,
+    groupPlatform: null,
+    groupLink: null,
   };
 }
 
@@ -165,11 +193,18 @@ export function mapUiClubToUpdateRequest(draft, currentClub) {
     name: draft.name.trim(),
     slug: slugify(draft.name),
     description: draft.summary.trim(),
-    category: draft.category.trim(),
+    category: normalizeClubCategory(draft.category),
     status: STATUS_VALUES[draft.health] ?? STATUS_VALUES[currentClub?.health] ?? STATUS_VALUES.Active,
     createdByUserId: null,
-    groupPlatform: draft.groupPlatform.trim(),
-    groupLink: draft.groupLink.trim(),
+    imageKey: draft.imageKey || currentClub?.imageKey || null,
+    groupPlatform: Object.prototype.hasOwnProperty.call(draft, 'groupLink')
+      ? draft.groupLink?.trim()
+        ? detectPlatform(draft.groupLink.trim())
+        : null
+      : currentClub?.groupPlatform ?? null,
+    groupLink: Object.prototype.hasOwnProperty.call(draft, 'groupLink')
+      ? draft.groupLink?.trim() || null
+      : currentClub?.groupLink ?? null,
   };
 }
 
@@ -182,15 +217,15 @@ export function mapUiAnnouncementToRequest(draft) {
 }
 
 export function mapUiEventToRequest(draft) {
-  const startAt = new Date(`${draft.date}T09:00:00`).toISOString();
-  const endAt = new Date(`${draft.date}T10:00:00`).toISOString();
+  const start = new Date(`${draft.date}T${draft.time}:00`);
+  const end = new Date(start.getTime() + 60 * 60 * 1000);
 
   return {
     title: draft.title.trim(),
     description: null,
     location: draft.location.trim(),
-    startAt,
-    endAt,
+    startAt: start.toISOString(),
+    endAt: end.toISOString(),
   };
 }
 

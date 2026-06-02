@@ -66,4 +66,16 @@ public sealed class JoinRequestsController(IClubWorkflowService clubWorkflowServ
         var result = await clubWorkflowService.RejectJoinRequestAsync(currentUser, requestId, cancellationToken);
         return result.Succeeded ? Ok(result.Value) : this.ToActionResult(result.Error!);
     }
+
+    [HttpDelete("clubs/{clubId:guid}/members/me")]
+    public async Task<IActionResult> LeaveClub(Guid clubId, CancellationToken cancellationToken)
+    {
+        if (!this.TryGetCurrentUser(out var currentUser))
+        {
+            return Unauthorized();
+        }
+
+        var result = await clubWorkflowService.LeaveClubAsync(currentUser, clubId, cancellationToken);
+        return result.Succeeded ? NoContent() : this.ToActionResult(result.Error!);
+    }
 }

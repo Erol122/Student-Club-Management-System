@@ -8,5 +8,5 @@ export const CLUB_MEMBER_ROLES = Object.freeze({
   Member: 'Member',
   Officer: 'Officer',
   VicePresident: 'Vice President',
-  President: 'President',
+  President: 'Club Leader',
 });

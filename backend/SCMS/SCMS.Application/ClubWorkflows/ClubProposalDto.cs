@@ -12,5 +12,6 @@ public sealed record ClubProposalDto(
     Guid? ProposedByUserId,
     string ProposedBy,
     string? ProposedByEmail,
+    string? ImageKey,
     DateTimeOffset SubmittedAt,
     DateTimeOffset UpdatedAt);

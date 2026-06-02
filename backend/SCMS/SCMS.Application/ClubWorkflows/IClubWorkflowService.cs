@@ -48,4 +48,9 @@ public interface IClubWorkflowService
         CurrentUserDto currentUser,
         Guid clubId,
         CancellationToken cancellationToken);
+
+    Task<ServiceResult> LeaveClubAsync(
+        CurrentUserDto currentUser,
+        Guid clubId,
+        CancellationToken cancellationToken);
 }

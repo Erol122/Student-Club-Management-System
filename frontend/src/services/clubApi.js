@@ -10,7 +10,7 @@ export async function parseResponse(response) {
   const contentType = response.headers.get('content-type') ?? '';
   const hasBody = response.status !== 204;
   const body = hasBody
-    ? contentType.includes('application/json')
+    ? contentType.includes('application/json') || contentType.includes('+json')
       ? await response.json()
       : await response.text()
     : null;
@@ -133,6 +133,52 @@ export async function createEvent(auth, clubId, payload) {
     auth.account,
     `${CLUBS_API_PATH}/${clubId}/events`,
     toJsonRequest(payload, 'POST')
+  );
+  return parseResponse(response);
+}
+
+export async function updateAnnouncement(auth, id, payload) {
+  const response = await apiFetch(
+    auth.instance, auth.account,
+    `${ANNOUNCEMENTS_API_PATH}/${id}`,
+    toJsonRequest(payload, 'PUT')
+  );
+  return parseResponse(response);
+}
+
+export async function deleteAnnouncement(auth, id) {
+  const response = await apiFetch(
+    auth.instance, auth.account,
+    `${ANNOUNCEMENTS_API_PATH}/${id}`,
+    { method: 'DELETE' }
+  );
+  return parseResponse(response);
+}
+
+export async function updateEvent(auth, id, payload) {
+  const response = await apiFetch(
+    auth.instance, auth.account,
+    `${EVENTS_API_PATH}/${id}`,
+    toJsonRequest(payload, 'PUT')
+  );
+  return parseResponse(response);
+}
+
+export async function deleteEvent(auth, id) {
+  const response = await apiFetch(
+    auth.instance, auth.account,
+    `${EVENTS_API_PATH}/${id}`,
+    { method: 'DELETE' }
+  );
+  return parseResponse(response);
+}
+
+export async function leaveClub(auth, clubId) {
+  const response = await apiFetch(
+    auth.instance,
+    auth.account,
+    `${CLUBS_API_PATH}/${clubId}/members/me`,
+    { method: 'DELETE' }
   );
   return parseResponse(response);
 }

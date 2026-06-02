@@ -27,6 +27,8 @@ public interface IClubWorkflowRepository
 
     Task<bool> UserHasApprovedMembershipAsync(Guid clubId, Guid userId, CancellationToken cancellationToken);
 
+    Task<ClubMembership?> GetApprovedMembershipAsync(Guid clubId, Guid userId, CancellationToken cancellationToken);
+
     Task<bool> UserOwnsClubAsync(Guid clubId, Guid userId, CancellationToken cancellationToken);
 
     Task<bool> UserOwnsAnyActiveClubAsync(

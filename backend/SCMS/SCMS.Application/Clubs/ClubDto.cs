@@ -8,6 +8,7 @@ public sealed record ClubDto(
     string Slug,
     string? Description,
     string? Category,
+    string? ImageKey,
     string? GroupPlatform,
     string? GroupLink,
     ClubStatus Status,

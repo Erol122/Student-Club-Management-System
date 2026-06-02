@@ -9,5 +9,6 @@ public sealed record UpdateClubRequest(
     string? Category,
     ClubStatus Status,
     Guid? CreatedByUserId = null,
+    string? ImageKey = null,
     string? GroupPlatform = null,
     string? GroupLink = null);

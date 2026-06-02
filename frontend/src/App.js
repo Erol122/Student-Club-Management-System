@@ -10,12 +10,14 @@ import { Sidebar } from './components/layout/Sidebar';
 import { Topbar } from './components/layout/Topbar';
 import { LoginView } from './components/views/LoginView';
 import { navItems } from './data/navigation';
+import { APP_ROLES } from './domain/roles';
 
 const DashboardView = lazy(() => import('./components/views/DashboardView').then((m) => ({ default: m.DashboardView })));
 const ClubsView = lazy(() => import('./components/views/ClubsView').then((m) => ({ default: m.ClubsView })));
 const OperationsView = lazy(() => import('./components/views/OperationsView').then((m) => ({ default: m.OperationsView })));
 
 const AuthenticatedShell = memo(function AuthenticatedShell({ currentUser }) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const dispatch = useAppDispatch();
   const { reloadWorkspace } = useClubActions();
   const {
@@ -38,7 +40,28 @@ const AuthenticatedShell = memo(function AuthenticatedShell({ currentUser }) {
     [clubs, selectedClubId]
   );
 
-  const pendingCount = clubRequests.length + membershipRequests.length;
+  const pendingCount = useMemo(() => {
+    if (activeRole === APP_ROLES.Admin) {
+      return clubRequests.length + membershipRequests.length;
+    }
+    if (activeRole === APP_ROLES.ClubLeader) {
+      const myClubIds = new Set(
+        clubs
+          .filter((c) => c.members.some((m) =>
+            (m.email === currentUser?.email || m.name === currentUser?.name) &&
+            m.role === 'Club Leader'
+          ))
+          .map((c) => c.id)
+      );
+      return membershipRequests.filter((r) => myClubIds.has(r.clubId)).length;
+    }
+    return 0;
+  }, [activeRole, clubRequests, membershipRequests, clubs, currentUser]);
+
+  const visibleNavItems = useMemo(
+    () => activeRole === APP_ROLES.Admin ? navItems.filter((item) => item.id !== 'manage') : navItems,
+    [activeRole]
+  );
 
   useEffect(() => {
     reloadWorkspace();
@@ -48,17 +71,30 @@ const AuthenticatedShell = memo(function AuthenticatedShell({ currentUser }) {
     <div className="app-shell">
       <Sidebar
         activeView={activeView}
-        items={navItems}
+        items={visibleNavItems}
         pendingCount={pendingCount}
         currentUser={currentUser}
         onNavigate={(view) => dispatch({ type: 'NAVIGATE', payload: view })}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
       />
 
+      <button
+        className={`sidebar-edge-btn${sidebarOpen ? ' open' : ''}`}
+        onClick={() => setSidebarOpen((o) => !o)}
+        aria-label={sidebarOpen ? 'Close navigation' : 'Open navigation'}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          {sidebarOpen ? (
+            <polyline points="15 18 9 12 15 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+          ) : (
+            <polyline points="9 18 15 12 9 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+          )}
+        </svg>
+      </button>
+
       <main className="platform-main">
-        <Topbar
-          activeView={activeView}
-          currentUser={currentUser}
-        />
+        <Topbar activeView={activeView} />
 
         <Suspense fallback={<div className="view-loading">Loading workspace...</div>}>
           {activeView === 'home' && (
@@ -72,6 +108,7 @@ const AuthenticatedShell = memo(function AuthenticatedShell({ currentUser }) {
               events={events}
               activityLog={activityLog}
               selectedClub={selectedClub}
+              clubDetailTab={clubDetailTab}
             />
           )}
 
@@ -80,6 +117,7 @@ const AuthenticatedShell = memo(function AuthenticatedShell({ currentUser }) {
               activeRole={activeRole}
               currentUser={currentUser}
               clubs={clubs}
+              clubRequests={clubRequests}
               selectedClub={selectedClub}
               selectedClubId={selectedClub?.id ?? ''}
               clubDetailTab={clubDetailTab}
@@ -101,6 +139,7 @@ const AuthenticatedShell = memo(function AuthenticatedShell({ currentUser }) {
               selectedClub={selectedClub}
               announcements={announcements}
               events={events}
+              clubDetailTab={clubDetailTab}
             />
           )}
 

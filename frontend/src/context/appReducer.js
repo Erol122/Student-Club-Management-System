@@ -83,6 +83,7 @@ export function reducer(state, action) {
         ...state,
         clubs,
         clubsLoading: false,
+        clubsSaving: false,
         clubsError: null,
         selectedClubId: syncSelectedClubId(state.selectedClubId, clubs),
       };
@@ -291,14 +292,50 @@ export function reducer(state, action) {
       return {
         ...state,
         clubsSaving: false,
-        events: [...state.events, evt].sort((a, b) => new Date(a.date) - new Date(b.date)),
+        events: [...state.events, evt].sort((a, b) => new Date(a.startAt) - new Date(b.startAt)),
         activityLog: [
-          logEntry(`Event scheduled: "${evt.title}" on ${evt.date}`, 'event'),
+          logEntry(`Event scheduled: "${evt.title}" on ${evt.date}${evt.time ? ` at ${evt.time}` : ''}`, 'event'),
           ...state.activityLog,
         ],
         toast: { message: `"${evt.title}" added to the calendar`, type: 'success' },
       };
     }
+
+    case 'UPDATE_ANNOUNCEMENT_SUCCESS': {
+      const updated = mapAnnouncementToUi(action.payload);
+      return {
+        ...state,
+        clubsSaving: false,
+        announcements: state.announcements.map((a) => a.id === updated.id ? updated : a),
+        toast: { message: 'Announcement updated', type: 'success' },
+      };
+    }
+
+    case 'DELETE_ANNOUNCEMENT_SUCCESS':
+      return {
+        ...state,
+        clubsSaving: false,
+        announcements: state.announcements.filter((a) => a.id !== action.payload),
+        toast: { message: 'Announcement deleted', type: 'success' },
+      };
+
+    case 'UPDATE_EVENT_SUCCESS': {
+      const updated = mapEventToUi(action.payload);
+      return {
+        ...state,
+        clubsSaving: false,
+        events: state.events.map((e) => e.id === updated.id ? updated : e).sort((a, b) => new Date(a.startAt) - new Date(b.startAt)),
+        toast: { message: 'Event updated', type: 'success' },
+      };
+    }
+
+    case 'DELETE_EVENT_SUCCESS':
+      return {
+        ...state,
+        clubsSaving: false,
+        events: state.events.filter((e) => e.id !== action.payload),
+        toast: { message: 'Event deleted', type: 'success' },
+      };
 
     case 'RSVP_EVENT': {
       const userName = state.currentUser?.name;

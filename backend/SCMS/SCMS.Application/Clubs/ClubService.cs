@@ -163,8 +163,8 @@ public sealed class ClubService(IClubRepository clubRepository) : IClubService
             NormalizeOptionalText(request.Description),
             NormalizeOptionalText(request.Category),
             NormalizeOptionalText(request.ImageKey),
-            club.GroupPlatform,
-            club.GroupLink,
+            NormalizeOptionalText(request.GroupPlatform),
+            NormalizeOptionalText(request.GroupLink),
             request.Status,
             createdByUserId);
 

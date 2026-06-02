@@ -162,6 +162,7 @@ public sealed class ClubsControllerTests
             "Engineering",
             null,
             null,
+            null,
             ClubStatus.Active,
             null,
             DateTimeOffset.UtcNow,
@@ -315,6 +316,14 @@ public sealed class ClubsControllerTests
             CancellationToken cancellationToken)
         {
             return Task.FromResult(DeleteResult);
+        }
+
+        public Task<ServiceResult> LeaveClubAsync(
+            CurrentUserDto currentUser,
+            Guid clubId,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(ServiceResult.Success());
         }
 
         private static ServiceResult<T> Failure<T>()

@@ -11,7 +11,7 @@ public sealed class DomainEntityTests
     {
         var proposer = TestData.User(displayName: "Ada Lovelace");
 
-        var club = Club.Propose("  AI Guild  ", "ai-guild", "Build useful AI tools.", "Technology", proposer);
+        var club = Club.Propose("  AI Guild  ", "ai-guild", "Build useful AI tools.", "Technology", null, proposer);
 
         Assert.NotEqual(Guid.Empty, club.Id);
         Assert.Equal("  AI Guild  ", club.Name);

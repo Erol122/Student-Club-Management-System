@@ -9,8 +9,12 @@ internal sealed class FakeClubContentRepository : IClubContentRepository
     public IReadOnlyList<Event> Events { get; set; } = [];
     public bool ActiveClubExists { get; set; } = true;
     public bool UserCanManageClub { get; set; }
+    public Announcement? AnnouncementToReturn { get; set; }
+    public Event? EventToReturn { get; set; }
     public Announcement? AddedAnnouncement { get; private set; }
     public Event? AddedEvent { get; private set; }
+    public Announcement? RemovedAnnouncement { get; private set; }
+    public Event? RemovedEvent { get; private set; }
     public int SaveChangesCount { get; private set; }
     public (Guid CurrentUserId, bool IncludeAllClubs)? LastAnnouncementsQuery { get; private set; }
     public (Guid CurrentUserId, bool IncludeAllClubs)? LastEventsQuery { get; private set; }
@@ -43,6 +47,12 @@ internal sealed class FakeClubContentRepository : IClubContentRepository
         return Task.FromResult(UserCanManageClub);
     }
 
+    public Task<Announcement?> GetAnnouncementAsync(Guid id, CancellationToken cancellationToken)
+        => Task.FromResult(AnnouncementToReturn);
+
+    public Task<Event?> GetEventAsync(Guid id, CancellationToken cancellationToken)
+        => Task.FromResult(EventToReturn);
+
     public Task AddAnnouncementAsync(Announcement announcement, CancellationToken cancellationToken)
     {
         AddedAnnouncement = announcement;
@@ -54,6 +64,10 @@ internal sealed class FakeClubContentRepository : IClubContentRepository
         AddedEvent = clubEvent;
         return Task.CompletedTask;
     }
+
+    public void RemoveAnnouncement(Announcement announcement) => RemovedAnnouncement = announcement;
+
+    public void RemoveEvent(Event clubEvent) => RemovedEvent = clubEvent;
 
     public Task SaveChangesAsync(CancellationToken cancellationToken)
     {

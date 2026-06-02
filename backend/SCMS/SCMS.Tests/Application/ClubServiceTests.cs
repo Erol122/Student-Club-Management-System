@@ -34,13 +34,13 @@ public sealed class ClubServiceTests
             dto.Members,
             first =>
             {
-                Assert.Equal(member.Id, first.UserId);
-                Assert.Equal(ClubMembershipRole.Member, first.Role);
+                Assert.Equal(president.Id, first.UserId);
+                Assert.Equal(ClubMembershipRole.President, first.Role);
             },
             second =>
             {
-                Assert.Equal(president.Id, second.UserId);
-                Assert.Equal(ClubMembershipRole.President, second.Role);
+                Assert.Equal(member.Id, second.UserId);
+                Assert.Equal(ClubMembershipRole.Member, second.Role);
             });
     }
 
@@ -116,8 +116,9 @@ public sealed class ClubServiceTests
                 "  Build robots.  ",
                 "  Engineering  ",
                 ClubStatus.Active,
-                "  Discord  ",
-                "  https://example.edu/robotics  "),
+                ImageKey: null,
+                GroupPlatform: "  Discord  ",
+                GroupLink: "  https://example.edu/robotics  "),
             CancellationToken.None);
 
         Assert.True(result.Succeeded);

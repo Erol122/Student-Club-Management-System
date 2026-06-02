@@ -215,7 +215,323 @@ public sealed class ClubContentServiceTests
         Assert.Equal("Event Author", dto.Author);
     }
 
+    // ── UpdateAnnouncementAsync ───────────────────────────────────────────────
+
+    [Fact]
+    public async Task UpdateAnnouncementAsync_WhenAnnouncementDoesNotExist_ReturnsNotFound()
+    {
+        var repository = new FakeClubContentRepository { AnnouncementToReturn = null };
+        var service = new ClubContentService(repository);
+
+        var result = await service.UpdateAnnouncementAsync(
+            TestData.CurrentUser(AppRole.Admin),
+            Guid.NewGuid(),
+            new UpdateAnnouncementRequest("New Title", "New body", null),
+            CancellationToken.None);
+
+        AssertFailure(result, ServiceErrorType.NotFound);
+        Assert.Equal(0, repository.SaveChangesCount);
+    }
+
+    [Fact]
+    public async Task UpdateAnnouncementAsync_WhenUserCannotManageClub_ReturnsForbidden()
+    {
+        var announcement = new Announcement
+        {
+            Id = Guid.NewGuid(),
+            ClubId = Guid.NewGuid(),
+            Title = "Old Title",
+            Content = "Old body",
+            CreatedByUser = TestData.User()
+        };
+        var repository = new FakeClubContentRepository
+        {
+            AnnouncementToReturn = announcement,
+            UserCanManageClub = false
+        };
+        var service = new ClubContentService(repository);
+
+        var result = await service.UpdateAnnouncementAsync(
+            TestData.CurrentUser(AppRole.Member),
+            announcement.Id,
+            new UpdateAnnouncementRequest("New Title", "New body", null),
+            CancellationToken.None);
+
+        AssertFailure(result, ServiceErrorType.Forbidden);
+        Assert.Equal("Old Title", announcement.Title);
+        Assert.Equal(0, repository.SaveChangesCount);
+    }
+
+    [Fact]
+    public async Task UpdateAnnouncementAsync_WhenValid_TrimsFieldsAndSaves()
+    {
+        var author = TestData.User(displayName: "Club Leader");
+        var announcement = new Announcement
+        {
+            Id = Guid.NewGuid(),
+            ClubId = Guid.NewGuid(),
+            Title = "Old Title",
+            Content = "Old body",
+            Audience = AnnouncementAudience.Members,
+            CreatedByUser = author
+        };
+        var repository = new FakeClubContentRepository
+        {
+            AnnouncementToReturn = announcement,
+            UserCanManageClub = true
+        };
+        var service = new ClubContentService(repository);
+
+        var result = await service.UpdateAnnouncementAsync(
+            TestData.CurrentUser(AppRole.ClubLeader),
+            announcement.Id,
+            new UpdateAnnouncementRequest("  Updated Title  ", "  Updated body.  ", "Public"),
+            CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("Updated Title", announcement.Title);
+        Assert.Equal("Updated body.", announcement.Content);
+        Assert.Equal(AnnouncementAudience.Public, announcement.Audience);
+        Assert.Equal(1, repository.SaveChangesCount);
+    }
+
+    // ── DeleteAnnouncementAsync ───────────────────────────────────────────────
+
+    [Fact]
+    public async Task DeleteAnnouncementAsync_WhenAnnouncementDoesNotExist_ReturnsNotFound()
+    {
+        var repository = new FakeClubContentRepository { AnnouncementToReturn = null };
+        var service = new ClubContentService(repository);
+
+        var result = await service.DeleteAnnouncementAsync(
+            TestData.CurrentUser(AppRole.Admin),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        AssertFailure(result, ServiceErrorType.NotFound);
+        Assert.Equal(0, repository.SaveChangesCount);
+    }
+
+    [Fact]
+    public async Task DeleteAnnouncementAsync_WhenUserCannotManageClub_ReturnsForbidden()
+    {
+        var announcement = new Announcement
+        {
+            Id = Guid.NewGuid(),
+            ClubId = Guid.NewGuid(),
+            CreatedByUser = TestData.User()
+        };
+        var repository = new FakeClubContentRepository
+        {
+            AnnouncementToReturn = announcement,
+            UserCanManageClub = false
+        };
+        var service = new ClubContentService(repository);
+
+        var result = await service.DeleteAnnouncementAsync(
+            TestData.CurrentUser(AppRole.Member),
+            announcement.Id,
+            CancellationToken.None);
+
+        AssertFailure(result, ServiceErrorType.Forbidden);
+        Assert.Null(repository.RemovedAnnouncement);
+        Assert.Equal(0, repository.SaveChangesCount);
+    }
+
+    [Fact]
+    public async Task DeleteAnnouncementAsync_WhenValid_RemovesAndSaves()
+    {
+        var announcement = new Announcement
+        {
+            Id = Guid.NewGuid(),
+            ClubId = Guid.NewGuid(),
+            CreatedByUser = TestData.User()
+        };
+        var repository = new FakeClubContentRepository
+        {
+            AnnouncementToReturn = announcement,
+            UserCanManageClub = true
+        };
+        var service = new ClubContentService(repository);
+
+        var result = await service.DeleteAnnouncementAsync(
+            TestData.CurrentUser(AppRole.ClubLeader),
+            announcement.Id,
+            CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Same(announcement, repository.RemovedAnnouncement);
+        Assert.Equal(1, repository.SaveChangesCount);
+    }
+
+    // ── UpdateEventAsync ─────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task UpdateEventAsync_WhenEventDoesNotExist_ReturnsNotFound()
+    {
+        var repository = new FakeClubContentRepository { EventToReturn = null };
+        var service = new ClubContentService(repository);
+        var start = DateTimeOffset.UtcNow.AddDays(1);
+
+        var result = await service.UpdateEventAsync(
+            TestData.CurrentUser(AppRole.Admin),
+            Guid.NewGuid(),
+            new UpdateEventRequest("Workshop", null, null, start, null),
+            CancellationToken.None);
+
+        AssertFailure(result, ServiceErrorType.NotFound);
+        Assert.Equal(0, repository.SaveChangesCount);
+    }
+
+    [Fact]
+    public async Task UpdateEventAsync_WhenUserCannotManageClub_ReturnsForbidden()
+    {
+        var clubEvent = new DomainEvent
+        {
+            Id = Guid.NewGuid(),
+            ClubId = Guid.NewGuid(),
+            Title = "Old Title",
+            StartAt = DateTimeOffset.UtcNow.AddDays(2),
+            EndAt = DateTimeOffset.UtcNow.AddDays(2).AddHours(1),
+            CreatedByUser = TestData.User()
+        };
+        var repository = new FakeClubContentRepository
+        {
+            EventToReturn = clubEvent,
+            UserCanManageClub = false
+        };
+        var service = new ClubContentService(repository);
+        var start = DateTimeOffset.UtcNow.AddDays(3);
+
+        var result = await service.UpdateEventAsync(
+            TestData.CurrentUser(AppRole.Member),
+            clubEvent.Id,
+            new UpdateEventRequest("New Title", null, null, start, null),
+            CancellationToken.None);
+
+        AssertFailure(result, ServiceErrorType.Forbidden);
+        Assert.Equal("Old Title", clubEvent.Title);
+        Assert.Equal(0, repository.SaveChangesCount);
+    }
+
+    [Fact]
+    public async Task UpdateEventAsync_WhenValid_UpdatesFieldsAndDefaultsEndTime()
+    {
+        var author = TestData.User(displayName: "Leader");
+        var clubEvent = new DomainEvent
+        {
+            Id = Guid.NewGuid(),
+            ClubId = Guid.NewGuid(),
+            Title = "Old Title",
+            Location = "Old Room",
+            StartAt = DateTimeOffset.UtcNow.AddDays(1),
+            EndAt = DateTimeOffset.UtcNow.AddDays(1).AddHours(1),
+            CreatedByUser = author
+        };
+        var repository = new FakeClubContentRepository
+        {
+            EventToReturn = clubEvent,
+            UserCanManageClub = true
+        };
+        var service = new ClubContentService(repository);
+        var newStart = DateTimeOffset.UtcNow.AddDays(5);
+
+        var result = await service.UpdateEventAsync(
+            TestData.CurrentUser(AppRole.ClubLeader),
+            clubEvent.Id,
+            new UpdateEventRequest("  Workshop  ", "  Details.  ", "  Lab 2  ", newStart, null),
+            CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("Workshop", clubEvent.Title);
+        Assert.Equal("Details.", clubEvent.Description);
+        Assert.Equal("Lab 2", clubEvent.Location);
+        Assert.Equal(newStart, clubEvent.StartAt);
+        Assert.Equal(newStart.AddHours(1), clubEvent.EndAt);
+        Assert.Equal(1, repository.SaveChangesCount);
+    }
+
+    // ── DeleteEventAsync ─────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task DeleteEventAsync_WhenEventDoesNotExist_ReturnsNotFound()
+    {
+        var repository = new FakeClubContentRepository { EventToReturn = null };
+        var service = new ClubContentService(repository);
+
+        var result = await service.DeleteEventAsync(
+            TestData.CurrentUser(AppRole.Admin),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        AssertFailure(result, ServiceErrorType.NotFound);
+        Assert.Equal(0, repository.SaveChangesCount);
+    }
+
+    [Fact]
+    public async Task DeleteEventAsync_WhenUserCannotManageClub_ReturnsForbidden()
+    {
+        var clubEvent = new DomainEvent
+        {
+            Id = Guid.NewGuid(),
+            ClubId = Guid.NewGuid(),
+            StartAt = DateTimeOffset.UtcNow.AddDays(1),
+            EndAt = DateTimeOffset.UtcNow.AddDays(1).AddHours(1),
+            CreatedByUser = TestData.User()
+        };
+        var repository = new FakeClubContentRepository
+        {
+            EventToReturn = clubEvent,
+            UserCanManageClub = false
+        };
+        var service = new ClubContentService(repository);
+
+        var result = await service.DeleteEventAsync(
+            TestData.CurrentUser(AppRole.Member),
+            clubEvent.Id,
+            CancellationToken.None);
+
+        AssertFailure(result, ServiceErrorType.Forbidden);
+        Assert.Null(repository.RemovedEvent);
+        Assert.Equal(0, repository.SaveChangesCount);
+    }
+
+    [Fact]
+    public async Task DeleteEventAsync_WhenValid_RemovesAndSaves()
+    {
+        var clubEvent = new DomainEvent
+        {
+            Id = Guid.NewGuid(),
+            ClubId = Guid.NewGuid(),
+            StartAt = DateTimeOffset.UtcNow.AddDays(1),
+            EndAt = DateTimeOffset.UtcNow.AddDays(1).AddHours(1),
+            CreatedByUser = TestData.User()
+        };
+        var repository = new FakeClubContentRepository
+        {
+            EventToReturn = clubEvent,
+            UserCanManageClub = true
+        };
+        var service = new ClubContentService(repository);
+
+        var result = await service.DeleteEventAsync(
+            TestData.CurrentUser(AppRole.ClubLeader),
+            clubEvent.Id,
+            CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Same(clubEvent, repository.RemovedEvent);
+        Assert.Equal(1, repository.SaveChangesCount);
+    }
+
     private static void AssertFailure<T>(ServiceResult<T> result, ServiceErrorType errorType)
+    {
+        Assert.False(result.Succeeded);
+        Assert.NotNull(result.Error);
+        Assert.Equal(errorType, result.Error.Type);
+    }
+
+    private static void AssertFailure(ServiceResult result, ServiceErrorType errorType)
     {
         Assert.False(result.Succeeded);
         Assert.NotNull(result.Error);

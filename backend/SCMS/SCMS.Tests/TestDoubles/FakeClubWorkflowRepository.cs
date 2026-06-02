@@ -97,6 +97,11 @@ internal sealed class FakeClubWorkflowRepository : IClubWorkflowRepository
         return Task.FromResult(PendingJoinRequestExists(clubId, userId));
     }
 
+    public Task<ClubMembership?> GetApprovedMembershipAsync(Guid clubId, Guid userId, CancellationToken cancellationToken)
+    {
+        return Task.FromResult<ClubMembership?>(null);
+    }
+
     public Task AddClubAsync(Club club, CancellationToken cancellationToken)
     {
         AddedClubs.Add(club);

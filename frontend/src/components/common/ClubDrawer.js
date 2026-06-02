@@ -166,7 +166,7 @@ function EditForm({ club, onSave, onCancel, isSaving, mode = 'details' }) {
     health: club.health,
     groupLink: club.groupLink || '',
   });
-  const isWhatsAppOnly = mode === 'whatsapp';
+  const isLinkOnly = mode === 'whatsapp';
 
   return (
     <form
@@ -177,7 +177,7 @@ function EditForm({ club, onSave, onCancel, isSaving, mode = 'details' }) {
         onSave(draft);
       }}
     >
-      {!isWhatsAppOnly ? (
+      {!isLinkOnly ? (
         <>
           <label>
             Club name
@@ -193,18 +193,16 @@ function EditForm({ club, onSave, onCancel, isSaving, mode = 'details' }) {
           </label>
         </>
       ) : null}
-      {isWhatsAppOnly ? (
-        <label>
-          WhatsApp group link
-          <input
-            type="url"
-            value={draft.groupLink}
-            onChange={(e) => setDraft((p) => ({ ...p, groupLink: e.target.value }))}
-            placeholder="https://chat.whatsapp.com/..."
-            maxLength="500"
-          />
-        </label>
-      ) : null}
+      <label>
+        Group chat link
+        <input
+          type="url"
+          value={draft.groupLink}
+          onChange={(e) => setDraft((p) => ({ ...p, groupLink: e.target.value }))}
+          placeholder="https://chat.whatsapp.com/, discord.gg/..."
+          maxLength="500"
+        />
+      </label>
       <div className="inline-actions form-actions">
         <button type="submit" className="primary-button" disabled={isSaving}>{isSaving ? 'Saving...' : 'Save changes'}</button>
         <button type="button" className="ghost-button" onClick={onCancel} disabled={isSaving}>Cancel</button>
@@ -235,8 +233,20 @@ export function ClubDrawer({
     const saved = await onSave(draft);
     if (saved) setIsEditing(false);
   };
-  const canUseWhatsApp = Boolean(onLeave || editMode === 'whatsapp');
-  const showWhatsAppActions = canUseWhatsApp && Boolean(selectedClub.groupLink || editMode === 'whatsapp');
+
+  const canEditLink = editMode === 'whatsapp' || Boolean(onDelete);
+  const showLinkSection = Boolean(onLeave || canEditLink) && Boolean(selectedClub.groupLink || canEditLink);
+
+  function platformLabel(link, stored) {
+    if (stored && stored !== 'Chat group') return stored;
+    if (!link) return 'Group chat';
+    if (link.includes('whatsapp.com')) return 'WhatsApp';
+    if (link.includes('discord.gg') || link.includes('discord.com')) return 'Discord';
+    if (link.includes('t.me') || link.includes('telegram')) return 'Telegram';
+    if (link.includes('teams.microsoft.com')) return 'Microsoft Teams';
+    return stored || 'Group chat';
+  }
+  const chatLabel = platformLabel(selectedClub.groupLink, selectedClub.groupPlatform);
 
   return (
     <>
@@ -279,10 +289,10 @@ export function ClubDrawer({
               announcements={announcements}
               events={events}
             />
-            {showWhatsAppActions ? (
-              <section className="whatsapp-card" aria-label="WhatsApp group">
+            {showLinkSection ? (
+              <section className="whatsapp-card" aria-label="Group chat">
                 <div className="whatsapp-card-copy">
-                  <strong>WhatsApp group</strong>
+                  <strong>{chatLabel}</strong>
                   <p>
                     {selectedClub.groupLink
                       ? 'Members can use this invite to join the club chat.'
@@ -295,10 +305,10 @@ export function ClubDrawer({
                 <div className="whatsapp-card-actions">
                   {selectedClub.groupLink ? (
                     <a className="primary-button link-button" href={selectedClub.groupLink} target="_blank" rel="noreferrer">
-                      Open WhatsApp group
+                      Join {chatLabel}
                     </a>
                   ) : null}
-                  {editMode === 'whatsapp' ? (
+                  {canEditLink ? (
                     <button type="button" className="ghost-button" onClick={() => setIsEditing(true)} disabled={isSaving}>
                       {selectedClub.groupLink ? 'Edit link' : 'Add link'}
                     </button>

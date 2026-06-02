@@ -55,6 +55,15 @@ export function logEntry(message, type = 'info') {
   };
 }
 
+function detectPlatform(url) {
+  if (!url) return null;
+  if (url.includes('whatsapp.com')) return 'WhatsApp';
+  if (url.includes('discord.gg') || url.includes('discord.com')) return 'Discord';
+  if (url.includes('t.me') || url.includes('telegram')) return 'Telegram';
+  if (url.includes('teams.microsoft.com')) return 'Microsoft Teams';
+  return 'Chat group';
+}
+
 function slugify(value) {
   return value
     .trim()
@@ -189,7 +198,7 @@ export function mapUiClubToUpdateRequest(draft, currentClub) {
     imageKey: draft.imageKey || currentClub?.imageKey || null,
     groupPlatform: Object.prototype.hasOwnProperty.call(draft, 'groupLink')
       ? draft.groupLink?.trim()
-        ? 'WhatsApp'
+        ? detectPlatform(draft.groupLink.trim())
         : null
       : currentClub?.groupPlatform ?? null,
     groupLink: Object.prototype.hasOwnProperty.call(draft, 'groupLink')

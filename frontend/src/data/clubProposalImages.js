@@ -1,14 +1,14 @@
-import art from '../assets/club-images/art.jpg';
-import chess from '../assets/club-images/chess.jpg';
-import debate from '../assets/club-images/debate.jpg';
-import fitness from '../assets/club-images/fitness.jpg';
-import game from '../assets/club-images/game.jpg';
-import hiking from '../assets/club-images/hiking.jpg';
-import movie from '../assets/club-images/movie.jpg';
-import music from '../assets/club-images/music.jpg';
-import photography from '../assets/club-images/photography.jpg';
-import study from '../assets/club-images/study.jpg';
-import theatre from '../assets/club-images/theatre.jpg';
+import art from '../assets/club-images-webp/art.webp';
+import chess from '../assets/club-images-webp/chess.webp';
+import debate from '../assets/club-images-webp/debate.webp';
+import fitness from '../assets/club-images-webp/fitness.webp';
+import game from '../assets/club-images-webp/game.webp';
+import hiking from '../assets/club-images-webp/hiking.webp';
+import movie from '../assets/club-images-webp/movie.webp';
+import music from '../assets/club-images-webp/music.webp';
+import photography from '../assets/club-images-webp/photography.webp';
+import study from '../assets/club-images-webp/study.webp';
+import theatre from '../assets/club-images-webp/theatre.webp';
 
 export const clubProposalImages = [
   { key: 'chess', label: 'Chess', src: chess },

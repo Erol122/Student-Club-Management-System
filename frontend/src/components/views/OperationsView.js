@@ -29,7 +29,7 @@ function ProposalImagePicker({ value, onChange }) {
             className={`proposal-image-option ${value === image.key ? 'selected' : ''}`.trim()}
             onClick={() => onChange(image.key)}
           >
-            <img src={image.src} alt="" />
+            <img src={image.src} alt="" loading="lazy" />
             <span>{image.label}</span>
           </button>
         ))}
@@ -42,13 +42,7 @@ function ProposalThumbnail({ imageKey }) {
   const image = clubProposalImageByKey.get(imageKey);
   if (!image) return null;
 
-  return (
-    <img
-      className="proposal-list-image"
-      src={image.src}
-      alt=""
-    />
-  );
+  return <img className="proposal-list-image" src={image.src} alt="" loading="lazy" />;
 }
 
 // ── Admin: redirect to Clubs (everything is managed there) ─────────────────

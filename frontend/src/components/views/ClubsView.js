@@ -159,7 +159,7 @@ export const ClubsView = memo(function ClubsView({
                       aria-label={`View ${req.name} proposal details`}
                     >
                       {proposalImage ? (
-                        <img className="proposal-row-image" src={proposalImage.src} alt="" />
+                        <img className="proposal-row-image" src={proposalImage.src} alt="" loading="lazy" />
                       ) : null}
                       <span className="proposal-row-copy">
                         <strong>{req.name}</strong>
@@ -485,7 +485,7 @@ function ProposalDetailsModal({ proposal, isSaving, onClose, onApprove, onReject
       <div className="modal-backdrop" onClick={onClose} />
       <div className="modal-card proposal-modal-card" role="dialog" aria-modal="true" aria-labelledby="proposal-modal-title">
         {proposalImage ? (
-          <img className="proposal-modal-image" src={proposalImage.src} alt="" />
+          <img className="proposal-modal-image" src={proposalImage.src} alt="" loading="lazy" />
         ) : null}
         <div className="proposal-modal-header">
           <div>

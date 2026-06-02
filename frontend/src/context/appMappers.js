@@ -44,6 +44,7 @@ const ROLE_LABELS = {
   Officer: CLUB_MEMBER_ROLES.Officer,
   VicePresident: CLUB_MEMBER_ROLES.VicePresident,
   President: CLUB_MEMBER_ROLES.President,
+  'Club Leader': CLUB_MEMBER_ROLES.President,
 };
 
 export function logEntry(message, type = 'info') {
@@ -97,8 +98,8 @@ export function mapApiClubToUi(dto, existingClub = null) {
     accent: existingClub?.accent ?? DEFAULT_ACCENT,
     health: normalizeClubStatus(dto.status),
     nextEvent: existingClub?.nextEvent ?? DEFAULT_NEXT_EVENT,
-    groupPlatform: dto.groupPlatform ?? existingClub?.groupPlatform ?? '',
-    groupLink: dto.groupLink ?? existingClub?.groupLink ?? '',
+    groupPlatform: 'groupPlatform' in dto ? (dto.groupPlatform || '') : (existingClub?.groupPlatform ?? ''),
+    groupLink: 'groupLink' in dto ? (dto.groupLink || '') : (existingClub?.groupLink ?? ''),
     announcementsCount: existingClub?.announcementsCount ?? 0,
     members,
     slug: dto.slug,

@@ -40,7 +40,23 @@ const AuthenticatedShell = memo(function AuthenticatedShell({ currentUser }) {
     [clubs, selectedClubId]
   );
 
-  const pendingCount = clubRequests.length + membershipRequests.length;
+  const pendingCount = useMemo(() => {
+    if (activeRole === APP_ROLES.Admin) {
+      return clubRequests.length + membershipRequests.length;
+    }
+    if (activeRole === APP_ROLES.ClubLeader) {
+      const myClubIds = new Set(
+        clubs
+          .filter((c) => c.members.some((m) =>
+            (m.email === currentUser?.email || m.name === currentUser?.name) &&
+            m.role === 'Club Leader'
+          ))
+          .map((c) => c.id)
+      );
+      return membershipRequests.filter((r) => myClubIds.has(r.clubId)).length;
+    }
+    return 0;
+  }, [activeRole, clubRequests, membershipRequests, clubs, currentUser]);
 
   const visibleNavItems = useMemo(
     () => activeRole === APP_ROLES.Admin ? navItems.filter((item) => item.id !== 'manage') : navItems,

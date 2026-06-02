@@ -83,6 +83,20 @@ public sealed class ClubContentRepository(AppDbContext dbContext) : IClubContent
             cancellationToken);
     }
 
+    public async Task<Announcement?> GetAnnouncementAsync(Guid id, CancellationToken cancellationToken)
+    {
+        return await dbContext.Announcements
+            .Include(a => a.CreatedByUser)
+            .FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
+    }
+
+    public async Task<Event?> GetEventAsync(Guid id, CancellationToken cancellationToken)
+    {
+        return await dbContext.Events
+            .Include(e => e.CreatedByUser)
+            .FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
+    }
+
     public async Task AddAnnouncementAsync(Announcement announcement, CancellationToken cancellationToken)
     {
         await dbContext.Announcements.AddAsync(announcement, cancellationToken);
@@ -91,6 +105,16 @@ public sealed class ClubContentRepository(AppDbContext dbContext) : IClubContent
     public async Task AddEventAsync(Event clubEvent, CancellationToken cancellationToken)
     {
         await dbContext.Events.AddAsync(clubEvent, cancellationToken);
+    }
+
+    public void RemoveAnnouncement(Announcement announcement)
+    {
+        dbContext.Announcements.Remove(announcement);
+    }
+
+    public void RemoveEvent(Event clubEvent)
+    {
+        dbContext.Events.Remove(clubEvent);
     }
 
     public async Task SaveChangesAsync(CancellationToken cancellationToken)

@@ -137,6 +137,42 @@ export async function createEvent(auth, clubId, payload) {
   return parseResponse(response);
 }
 
+export async function updateAnnouncement(auth, id, payload) {
+  const response = await apiFetch(
+    auth.instance, auth.account,
+    `${ANNOUNCEMENTS_API_PATH}/${id}`,
+    toJsonRequest(payload, 'PUT')
+  );
+  return parseResponse(response);
+}
+
+export async function deleteAnnouncement(auth, id) {
+  const response = await apiFetch(
+    auth.instance, auth.account,
+    `${ANNOUNCEMENTS_API_PATH}/${id}`,
+    { method: 'DELETE' }
+  );
+  return parseResponse(response);
+}
+
+export async function updateEvent(auth, id, payload) {
+  const response = await apiFetch(
+    auth.instance, auth.account,
+    `${EVENTS_API_PATH}/${id}`,
+    toJsonRequest(payload, 'PUT')
+  );
+  return parseResponse(response);
+}
+
+export async function deleteEvent(auth, id) {
+  const response = await apiFetch(
+    auth.instance, auth.account,
+    `${EVENTS_API_PATH}/${id}`,
+    { method: 'DELETE' }
+  );
+  return parseResponse(response);
+}
+
 export async function leaveClub(auth, clubId) {
   const response = await apiFetch(
     auth.instance,

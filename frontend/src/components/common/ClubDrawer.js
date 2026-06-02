@@ -140,7 +140,7 @@ function ClubDetailBody({ selectedClub, clubDetailTab, announcements, events }) 
                 </div>
                 <div>
                   <strong>{member.name}</strong>
-                  <p>{isPresident ? 'President' : member.program}</p>
+                  <p>{isPresident ? 'Club Leader' : member.program}</p>
                 </div>
                 <span className="role-pill">{member.role}</span>
               </article>

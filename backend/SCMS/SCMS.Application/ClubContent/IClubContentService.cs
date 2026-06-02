@@ -24,4 +24,26 @@ public interface IClubContentService
         Guid clubId,
         CreateEventRequest request,
         CancellationToken cancellationToken);
+
+    Task<ServiceResult<ClubAnnouncementDto>> UpdateAnnouncementAsync(
+        CurrentUserDto currentUser,
+        Guid announcementId,
+        UpdateAnnouncementRequest request,
+        CancellationToken cancellationToken);
+
+    Task<ServiceResult> DeleteAnnouncementAsync(
+        CurrentUserDto currentUser,
+        Guid announcementId,
+        CancellationToken cancellationToken);
+
+    Task<ServiceResult<ClubEventDto>> UpdateEventAsync(
+        CurrentUserDto currentUser,
+        Guid eventId,
+        UpdateEventRequest request,
+        CancellationToken cancellationToken);
+
+    Task<ServiceResult> DeleteEventAsync(
+        CurrentUserDto currentUser,
+        Guid eventId,
+        CancellationToken cancellationToken);
 }

@@ -105,6 +105,88 @@ public sealed class ClubContentService(IClubContentRepository repository) : IClu
         return ServiceResult<ClubEventDto>.Success(ToEventDto(clubEvent, currentUser.DisplayName));
     }
 
+    public async Task<ServiceResult<ClubAnnouncementDto>> UpdateAnnouncementAsync(
+        CurrentUserDto currentUser,
+        Guid announcementId,
+        UpdateAnnouncementRequest request,
+        CancellationToken cancellationToken)
+    {
+        var announcement = await repository.GetAnnouncementAsync(announcementId, cancellationToken);
+        if (announcement is null)
+            return ServiceResult<ClubAnnouncementDto>.Failure(new ServiceError(ServiceErrorType.NotFound, "Announcement not found."));
+
+        var permissionError = await ValidateCanManageClubAsync(currentUser, announcement.ClubId, cancellationToken);
+        if (permissionError is not null)
+            return ServiceResult<ClubAnnouncementDto>.Failure(permissionError);
+
+        announcement.Title = request.Title.Trim();
+        announcement.Content = request.Body.Trim();
+        announcement.Audience = ParseAudience(request.Audience);
+
+        await repository.SaveChangesAsync(cancellationToken);
+        return ServiceResult<ClubAnnouncementDto>.Success(ToAnnouncementDto(announcement));
+    }
+
+    public async Task<ServiceResult> DeleteAnnouncementAsync(
+        CurrentUserDto currentUser,
+        Guid announcementId,
+        CancellationToken cancellationToken)
+    {
+        var announcement = await repository.GetAnnouncementAsync(announcementId, cancellationToken);
+        if (announcement is null)
+            return ServiceResult.Failure(new ServiceError(ServiceErrorType.NotFound, "Announcement not found."));
+
+        var permissionError = await ValidateCanManageClubAsync(currentUser, announcement.ClubId, cancellationToken);
+        if (permissionError is not null)
+            return ServiceResult.Failure(permissionError);
+
+        repository.RemoveAnnouncement(announcement);
+        await repository.SaveChangesAsync(cancellationToken);
+        return ServiceResult.Success();
+    }
+
+    public async Task<ServiceResult<ClubEventDto>> UpdateEventAsync(
+        CurrentUserDto currentUser,
+        Guid eventId,
+        UpdateEventRequest request,
+        CancellationToken cancellationToken)
+    {
+        var clubEvent = await repository.GetEventAsync(eventId, cancellationToken);
+        if (clubEvent is null)
+            return ServiceResult<ClubEventDto>.Failure(new ServiceError(ServiceErrorType.NotFound, "Event not found."));
+
+        var permissionError = await ValidateCanManageClubAsync(currentUser, clubEvent.ClubId, cancellationToken);
+        if (permissionError is not null)
+            return ServiceResult<ClubEventDto>.Failure(permissionError);
+
+        clubEvent.Title = request.Title.Trim();
+        clubEvent.Description = NormalizeOptionalText(request.Description);
+        clubEvent.Location = NormalizeOptionalText(request.Location);
+        clubEvent.StartAt = request.StartAt;
+        clubEvent.EndAt = request.EndAt ?? request.StartAt.AddHours(1);
+
+        await repository.SaveChangesAsync(cancellationToken);
+        return ServiceResult<ClubEventDto>.Success(ToEventDto(clubEvent));
+    }
+
+    public async Task<ServiceResult> DeleteEventAsync(
+        CurrentUserDto currentUser,
+        Guid eventId,
+        CancellationToken cancellationToken)
+    {
+        var clubEvent = await repository.GetEventAsync(eventId, cancellationToken);
+        if (clubEvent is null)
+            return ServiceResult.Failure(new ServiceError(ServiceErrorType.NotFound, "Event not found."));
+
+        var permissionError = await ValidateCanManageClubAsync(currentUser, clubEvent.ClubId, cancellationToken);
+        if (permissionError is not null)
+            return ServiceResult.Failure(permissionError);
+
+        repository.RemoveEvent(clubEvent);
+        await repository.SaveChangesAsync(cancellationToken);
+        return ServiceResult.Success();
+    }
+
     private async Task<ServiceError?> ValidateCanManageClubAsync(
         CurrentUserDto currentUser,
         Guid clubId,

@@ -57,7 +57,7 @@ function AdminRedirect() {
 }
 
 // ── Club Leader ────────────────────────────────────────────────────────────
-function LeaderManage({ clubs, selectedClub, membershipRequests, announcements, events, clubDetailTab, currentUser }) {
+function LeaderManage({ clubs, clubRequests: allClubRequests, selectedClub, membershipRequests, announcements, events, clubDetailTab, currentUser }) {
   const dispatch = useAppDispatch();
   const {
     approveMembershipRecord,
@@ -66,12 +66,19 @@ function LeaderManage({ clubs, selectedClub, membershipRequests, announcements, 
     scheduleEventRecord,
     submitClubProposalRecord,
     updateClubRecord,
+    updateAnnouncementRecord,
+    deleteAnnouncementRecord,
+    updateEventRecord,
+    deleteEventRecord,
   } = useClubActions();
   const { clubsSaving } = useAppState();
 
   const [activeTab, setActiveTab] = useState('requests');
+  const [editingAnnouncement, setEditingAnnouncement] = useState(null);
+  const [editingEvent, setEditingEvent] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerClubId, setDrawerClubId] = useState(null);
+  const [seenRequestsTab, setSeenRequestsTab] = useState(false);
 
   const leaderClubs = useMemo(
     () => clubs.filter((club) =>
@@ -118,6 +125,20 @@ function LeaderManage({ clubs, selectedClub, membershipRequests, announcements, 
     [leaderClubs, drawerClubId]
   );
 
+  const myProposals = useMemo(
+    () => (allClubRequests ?? []).filter(
+      (req) => req.proposedByEmail === currentUser?.email || req.proposedBy === currentUser?.name
+    ),
+    [allClubRequests, currentUser?.email, currentUser?.name]
+  );
+
+  const myJoinRequests = useMemo(
+    () => membershipRequests.filter(
+      (req) => req.email === currentUser?.email || req.student === currentUser?.name
+    ),
+    [membershipRequests, currentUser?.email, currentUser?.name]
+  );
+
   if (!activeClub) {
     return <p className="empty-state">No club is available to manage yet.</p>;
   }
@@ -126,7 +147,9 @@ function LeaderManage({ clubs, selectedClub, membershipRequests, announcements, 
     { id: 'requests', label: 'Requests', count: clubRequests.length },
     { id: 'announcements', label: 'Announcements' },
     { id: 'events', label: 'Events' },
-    { id: 'propose', label: 'Propose Club' },
+    { id: 'my-proposals', label: 'My Proposals', count: myProposals.filter((p) => !p.status || p.status === 'Pending').length },
+    { id: 'my-requests', label: 'My Join Requests', count: seenRequestsTab ? 0 : myJoinRequests.length },
+    { id: 'propose', label: 'Propose a Club' },
   ];
 
   return (
@@ -217,7 +240,7 @@ function LeaderManage({ clubs, selectedClub, membershipRequests, announcements, 
             key={tab.id}
             type="button"
             className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`.trim()}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => { setActiveTab(tab.id); if (tab.id === 'my-requests') setSeenRequestsTab(true); }}
           >
             {tab.label}
             {tab.count > 0 ? <span className="tab-badge">{tab.count}</span> : null}
@@ -243,8 +266,7 @@ function LeaderManage({ clubs, selectedClub, membershipRequests, announcements, 
               <article key={req.id} className="action-row">
                 <div>
                   <strong>{req.student}</strong>
-                  <p>{req.program}</p>
-                  {req.reason ? <span>{req.reason}</span> : null}
+                  <p>{req.program}{req.reason ? ` · ${req.reason}` : ''}</p>
                 </div>
                 <div className="inline-actions">
                   <button
@@ -283,11 +305,15 @@ function LeaderManage({ clubs, selectedClub, membershipRequests, announcements, 
               ) : null}
               {clubAnnouncements.map((item) => (
                 <article key={item.id} className="feed-item">
-                  <div>
+                  <div className="feed-item-content">
                     <strong>{item.title}</strong>
                     <p>{item.body}</p>
                   </div>
-                  <span>{item.date}</span>
+                  <div className="feed-item-actions">
+                    <span className="feed-item-date">{item.date}</span>
+                    <button type="button" className="ghost-button btn-sm" onClick={() => setEditingAnnouncement({ id: item.id, title: item.title, body: item.body })} disabled={clubsSaving}>Edit</button>
+                    <button type="button" className="danger-button btn-sm" onClick={() => deleteAnnouncementRecord(item.id)} disabled={clubsSaving}>Delete</button>
+                  </div>
                 </article>
               ))}
             </div>
@@ -302,28 +328,9 @@ function LeaderManage({ clubs, selectedClub, membershipRequests, announcements, 
                 if (published) setAnnouncementDraft(emptyAnnouncement);
               }}
             >
-              <label>
-                Title
-                <input
-                  value={announcementDraft.title}
-                  onChange={(e) => setAnnouncementDraft((prev) => ({ ...prev, title: e.target.value }))}
-                  placeholder="What's the update?"
-                  required
-                />
-              </label>
-              <label>
-                Message
-                <textarea
-                  rows="5"
-                  value={announcementDraft.body}
-                  onChange={(e) => setAnnouncementDraft((prev) => ({ ...prev, body: e.target.value }))}
-                  placeholder="Write your announcement here..."
-                  required
-                />
-              </label>
-              <button type="submit" className="primary-button" disabled={clubsSaving}>
-                {clubsSaving ? 'Publishing...' : 'Publish announcement'}
-              </button>
+              <label>Title<input value={announcementDraft.title} onChange={(e) => setAnnouncementDraft((prev) => ({ ...prev, title: e.target.value }))} placeholder="What's the update?" required /></label>
+              <label>Message<textarea rows="5" value={announcementDraft.body} onChange={(e) => setAnnouncementDraft((prev) => ({ ...prev, body: e.target.value }))} placeholder="Write your announcement here..." required /></label>
+              <button type="submit" className="primary-button" disabled={clubsSaving}>{clubsSaving ? 'Publishing...' : 'Publish announcement'}</button>
             </form>
           </SectionCard>
         </div>
@@ -342,11 +349,15 @@ function LeaderManage({ clubs, selectedClub, membershipRequests, announcements, 
               ) : null}
               {clubEvents.map((event) => (
                 <article key={event.id} className="feed-item">
-                  <div>
+                  <div className="feed-item-content">
                     <strong>{event.title}</strong>
                     <p>{event.location}</p>
                   </div>
-                  <span>{event.time ? `${event.date} · ${event.time}` : event.date}</span>
+                  <div className="feed-item-actions">
+                    <span className="feed-item-date">{event.time ? `${event.date} · ${event.time}` : event.date}</span>
+                    <button type="button" className="ghost-button btn-sm" onClick={() => setEditingEvent({ id: event.id, title: event.title, date: event.date, time: event.time || '', location: event.location || '' })} disabled={clubsSaving}>Edit</button>
+                    <button type="button" className="danger-button btn-sm" onClick={() => deleteEventRecord(event.id)} disabled={clubsSaving}>Delete</button>
+                  </div>
                 </article>
               ))}
             </div>
@@ -407,6 +418,61 @@ function LeaderManage({ clubs, selectedClub, membershipRequests, announcements, 
         </div>
       )}
 
+      {/* My Proposals tab */}
+      {activeTab === 'my-proposals' && (
+        <SectionCard
+          title="My club proposals"
+          subtitle={`${myProposals.length} proposal${myProposals.length === 1 ? '' : 's'} submitted`}
+        >
+          <div className="action-list">
+            {myProposals.length === 0 ? (
+              <p className="empty-state">You have not submitted any proposals yet.</p>
+            ) : null}
+            {myProposals.map((req) => (
+              <article key={req.id} className="proposal-list-card">
+                <ProposalThumbnail imageKey={req.imageKey} />
+                <div className="proposal-list-copy">
+                  <div className="proposal-list-top">
+                    <strong>{req.name}</strong>
+                    <span className={req.status === 'Approved' ? 'status-approved' : req.status === 'Rejected' ? 'status-rejected' : 'status-pending'}>
+                      {req.status ?? 'Pending'}
+                    </span>
+                  </div>
+                  <p className="proposal-list-meta">{req.category}</p>
+                  {req.mission ? <p className="proposal-list-mission">{req.mission}</p> : null}
+                </div>
+              </article>
+            ))}
+          </div>
+        </SectionCard>
+      )}
+
+      {/* My Join Requests tab */}
+      {activeTab === 'my-requests' && (
+        <SectionCard
+          title="My join requests"
+          subtitle={`${myJoinRequests.length} pending request${myJoinRequests.length === 1 ? '' : 's'}`}
+        >
+          <div className="action-list">
+            {myJoinRequests.length === 0 ? (
+              <p className="empty-state">No pending join requests.</p>
+            ) : null}
+            {myJoinRequests.map((req) => {
+              const club = clubs.find((c) => c.id === req.clubId);
+              return (
+                <article key={req.id} className="action-row">
+                  <div>
+                    <strong>{club?.name ?? req.clubId}</strong>
+                    <p>{club?.category ?? ''}</p>
+                  </div>
+                  <span className="status-pending">Pending review</span>
+                </article>
+              );
+            })}
+          </div>
+        </SectionCard>
+      )}
+
       {/* Propose Club tab */}
       {activeTab === 'propose' && (
         <SectionCard
@@ -464,6 +530,58 @@ function LeaderManage({ clubs, selectedClub, membershipRequests, announcements, 
           </form>
         </SectionCard>
       )}
+
+      {editingAnnouncement ? (
+        <>
+          <div className="modal-backdrop" onClick={() => setEditingAnnouncement(null)} />
+          <div className="modal-card" role="dialog" aria-modal="true">
+            <div className="modal-card-header">
+              <h3 className="modal-title">Edit announcement</h3>
+              <button type="button" className="modal-close-button" onClick={() => setEditingAnnouncement(null)}>&times;</button>
+            </div>
+            <form className="stack-form" onSubmit={async (e) => {
+              e.preventDefault();
+              const ok = await updateAnnouncementRecord(editingAnnouncement.id, editingAnnouncement);
+              if (ok) setEditingAnnouncement(null);
+            }}>
+              <label>Title<input value={editingAnnouncement.title} onChange={(e) => setEditingAnnouncement((p) => ({ ...p, title: e.target.value }))} required /></label>
+              <label>Message<textarea rows="5" value={editingAnnouncement.body} onChange={(e) => setEditingAnnouncement((p) => ({ ...p, body: e.target.value }))} required /></label>
+              <div className="inline-actions form-actions">
+                <button type="submit" className="primary-button" disabled={clubsSaving}>{clubsSaving ? 'Saving...' : 'Save changes'}</button>
+                <button type="button" className="ghost-button" onClick={() => setEditingAnnouncement(null)}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </>
+      ) : null}
+
+      {editingEvent ? (
+        <>
+          <div className="modal-backdrop" onClick={() => setEditingEvent(null)} />
+          <div className="modal-card" role="dialog" aria-modal="true">
+            <div className="modal-card-header">
+              <h3 className="modal-title">Edit event</h3>
+              <button type="button" className="modal-close-button" onClick={() => setEditingEvent(null)}>&times;</button>
+            </div>
+            <form className="stack-form" onSubmit={async (e) => {
+              e.preventDefault();
+              const ok = await updateEventRecord(editingEvent.id, editingEvent);
+              if (ok) setEditingEvent(null);
+            }}>
+              <label>Title<input value={editingEvent.title} onChange={(e) => setEditingEvent((p) => ({ ...p, title: e.target.value }))} required /></label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <label>Date<input type="date" value={editingEvent.date} onChange={(e) => setEditingEvent((p) => ({ ...p, date: e.target.value }))} required /></label>
+                <label>Time<input type="time" value={editingEvent.time} onChange={(e) => setEditingEvent((p) => ({ ...p, time: e.target.value }))} required /></label>
+              </div>
+              <label>Location<input value={editingEvent.location} onChange={(e) => setEditingEvent((p) => ({ ...p, location: e.target.value }))} placeholder="Room or address" /></label>
+              <div className="inline-actions form-actions">
+                <button type="submit" className="primary-button" disabled={clubsSaving}>{clubsSaving ? 'Saving...' : 'Save changes'}</button>
+                <button type="button" className="ghost-button" onClick={() => setEditingEvent(null)}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }
@@ -490,8 +608,8 @@ function MemberManage({ clubs, clubRequests, membershipRequests, currentUser }) 
 
   const tabs = [
     { id: 'requests', label: 'Join Requests', count: myRequests.length },
-    { id: 'proposals', label: 'My Proposals', count: myProposals.length },
-    { id: 'start', label: 'Start a Club' },
+    { id: 'proposals', label: 'My Proposals', count: myProposals.filter((p) => !p.status || p.status === 'Pending').length },
+    { id: 'start', label: 'Propose a Club' },
   ];
 
   return (
@@ -568,25 +686,29 @@ function MemberManage({ clubs, clubRequests, membershipRequests, currentUser }) 
           <div className="action-list">
             {myProposals.length === 0 ? (
               <p className="empty-state">
-                You have not submitted any club proposals yet. Switch to Start a Club to create one.
+                You have not submitted any club proposals yet. Switch to Propose a Club to create one.
               </p>
             ) : null}
             {myProposals.map((req) => (
-              <article key={req.id} className="action-row">
+              <article key={req.id} className="proposal-list-card">
                 <ProposalThumbnail imageKey={req.imageKey} />
                 <div className="proposal-list-copy">
-                  <strong>{req.name}</strong>
-                  <p>{req.category}</p>
-                  {req.mission ? <span>{req.mission}</span> : null}
+                  <div className="proposal-list-top">
+                    <strong>{req.name}</strong>
+                    <span className={req.status === 'Approved' ? 'status-approved' : req.status === 'Rejected' ? 'status-rejected' : 'status-pending'}>
+                      {req.status ?? 'Pending'}
+                    </span>
+                  </div>
+                  <p className="proposal-list-meta">{req.category}</p>
+                  {req.mission ? <p className="proposal-list-mission">{req.mission}</p> : null}
                 </div>
-                <span className="status-pending">Pending approval</span>
               </article>
             ))}
           </div>
         </SectionCard>
       )}
 
-      {/* Start a Club tab */}
+      {/* Propose a Club tab */}
       {activeTab === 'start' && (
         <SectionCard
           title="Start a new club"

@@ -301,6 +301,42 @@ export function reducer(state, action) {
       };
     }
 
+    case 'UPDATE_ANNOUNCEMENT_SUCCESS': {
+      const updated = mapAnnouncementToUi(action.payload);
+      return {
+        ...state,
+        clubsSaving: false,
+        announcements: state.announcements.map((a) => a.id === updated.id ? updated : a),
+        toast: { message: 'Announcement updated', type: 'success' },
+      };
+    }
+
+    case 'DELETE_ANNOUNCEMENT_SUCCESS':
+      return {
+        ...state,
+        clubsSaving: false,
+        announcements: state.announcements.filter((a) => a.id !== action.payload),
+        toast: { message: 'Announcement deleted', type: 'success' },
+      };
+
+    case 'UPDATE_EVENT_SUCCESS': {
+      const updated = mapEventToUi(action.payload);
+      return {
+        ...state,
+        clubsSaving: false,
+        events: state.events.map((e) => e.id === updated.id ? updated : e).sort((a, b) => new Date(a.startAt) - new Date(b.startAt)),
+        toast: { message: 'Event updated', type: 'success' },
+      };
+    }
+
+    case 'DELETE_EVENT_SUCCESS':
+      return {
+        ...state,
+        clubsSaving: false,
+        events: state.events.filter((e) => e.id !== action.payload),
+        toast: { message: 'Event deleted', type: 'success' },
+      };
+
     case 'RSVP_EVENT': {
       const userName = state.currentUser?.name;
       return {

@@ -18,6 +18,10 @@ import {
   submitClubProposal,
   submitJoinRequest,
   updateClub,
+  updateAnnouncement,
+  deleteAnnouncement,
+  updateEvent,
+  deleteEvent,
 } from '../services/clubApi';
 import {
   buildFieldError,
@@ -88,15 +92,23 @@ export function useClubActions() {
         }
 
         // Merge locally stored member proposals (survive page refresh)
-        const stored = getStoredProposals(userId);
-        if (stored.length > 0) {
-          // Remove proposals whose club is now live (admin approved them)
-          const liveNames = new Set(clubList.map(c => (c.name ?? '').toLowerCase()));
-          const stillPending = stored.filter(p => !liveNames.has((p.name ?? '').toLowerCase()));
-          if (stillPending.length !== stored.length) saveStoredProposals(userId, stillPending);
+        // Skip for admins — they get all proposals from the backend directly
+        const isAdmin = currentUserRef.current?.role === 'Admin';
+        if (!isAdmin) {
+          const stored = getStoredProposals(userId);
+          if (stored.length > 0) {
+            // Mark approved proposals (club is now live) instead of deleting them
+            const liveNames = new Set(clubList.map(c => (c.name ?? '').toLowerCase()));
+            const updatedStored = stored.map(p =>
+              liveNames.has((p.name ?? '').toLowerCase()) && p.status !== 'Approved'
+                ? { ...p, status: 'Approved' }
+                : p
+            );
+            saveStoredProposals(userId, updatedStored);
 
-          const apiIds = new Set(clubRequests.map(r => r.id));
-          clubRequests = [...clubRequests, ...stillPending.filter(p => !apiIds.has(p.id))];
+            const apiIds = new Set(clubRequests.map(r => r.id));
+            clubRequests = [...clubRequests, ...updatedStored.filter(p => !apiIds.has(p.id))];
+          }
         }
 
         // Fetch remaining data — each failure handled individually
@@ -252,6 +264,54 @@ export function useClubActions() {
       try {
         const event = await createEvent(getAuth(), clubId, mapUiEventToRequest(draft));
         dispatch({ type: 'SCHEDULE_EVENT_SUCCESS', payload: event });
+        return true;
+      } catch (error) {
+        dispatch({ type: 'SAVE_CLUB_FAILURE', payload: buildFieldError(error.body) || error.message });
+        return false;
+      }
+    },
+
+    async updateAnnouncementRecord(id, draft) {
+      dispatch({ type: 'SAVE_CLUB_START' });
+      try {
+        const ann = await updateAnnouncement(getAuth(), id, mapUiAnnouncementToRequest(draft));
+        dispatch({ type: 'UPDATE_ANNOUNCEMENT_SUCCESS', payload: ann });
+        return true;
+      } catch (error) {
+        dispatch({ type: 'SAVE_CLUB_FAILURE', payload: buildFieldError(error.body) || error.message });
+        return false;
+      }
+    },
+
+    async deleteAnnouncementRecord(id) {
+      dispatch({ type: 'SAVE_CLUB_START' });
+      try {
+        await deleteAnnouncement(getAuth(), id);
+        dispatch({ type: 'DELETE_ANNOUNCEMENT_SUCCESS', payload: id });
+        return true;
+      } catch (error) {
+        dispatch({ type: 'SAVE_CLUB_FAILURE', payload: buildFieldError(error.body) || error.message });
+        return false;
+      }
+    },
+
+    async updateEventRecord(id, draft) {
+      dispatch({ type: 'SAVE_CLUB_START' });
+      try {
+        const evt = await updateEvent(getAuth(), id, mapUiEventToRequest(draft));
+        dispatch({ type: 'UPDATE_EVENT_SUCCESS', payload: evt });
+        return true;
+      } catch (error) {
+        dispatch({ type: 'SAVE_CLUB_FAILURE', payload: buildFieldError(error.body) || error.message });
+        return false;
+      }
+    },
+
+    async deleteEventRecord(id) {
+      dispatch({ type: 'SAVE_CLUB_START' });
+      try {
+        await deleteEvent(getAuth(), id);
+        dispatch({ type: 'DELETE_EVENT_SUCCESS', payload: id });
         return true;
       } catch (error) {
         dispatch({ type: 'SAVE_CLUB_FAILURE', payload: buildFieldError(error.body) || error.message });

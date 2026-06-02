@@ -189,7 +189,7 @@ export const ClubsView = memo(function ClubsView({
                 const proposalImage = clubProposalImageByKey.get(req.imageKey);
 
                 return (
-                  <article key={req.id} className="action-row proposal-action-row">
+                  <article key={req.id} className="proposal-admin-card">
                     <button
                       type="button"
                       className="proposal-summary-button"
@@ -201,10 +201,11 @@ export const ClubsView = memo(function ClubsView({
                       ) : null}
                       <span className="proposal-row-copy">
                         <strong>{req.name}</strong>
-                        <p>{req.category} · {req.mission}</p>
+                        <p className="proposal-row-meta">{req.category}</p>
+                        {req.mission ? <p className="proposal-row-mission">{req.mission}</p> : null}
                       </span>
                     </button>
-                    <div className="inline-actions">
+                    <div className="inline-actions proposal-admin-actions">
                       <button
                         type="button"
                         className="ghost-button"
